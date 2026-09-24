@@ -1,0 +1,383 @@
+{
+  "collected_at": "2026-09-24T03:14:20.748922+00:00",
+  "ecc": {
+    "claude": {
+      "path": "/Users/bkh223/.claude/skills/everything-claude-code",
+      "present": true,
+      "surface": "skill-directory"
+    },
+    "codex": {
+      "path": "/Users/bkh223/.codex/skills/everything-claude-code",
+      "present": true,
+      "surface": "skill-directory"
+    },
+    "kimi": {
+      "path": "/Users/bkh223/.kimi/skills/everything-claude-code",
+      "present": false,
+      "surface": null
+    }
+  },
+  "host": {
+    "machine": "arm64",
+    "python": "3.13.7",
+    "release": "27.0.0",
+    "system": "Darwin"
+  },
+  "installations": {
+    "claude_config": {
+      "path": "/Users/bkh223/.claude",
+      "present": true
+    },
+    "codex_config": {
+      "path": "/Users/bkh223/.codex",
+      "present": true
+    },
+    "gemini_config": {
+      "path": "/Users/bkh223/.gemini",
+      "present": true
+    },
+    "openclaw_state": {
+      "path": "/Users/bkh223/.openclaw",
+      "present": true
+    }
+  },
+  "openclaw": {
+    "agents": [
+      {
+        "binding_count": 0,
+        "default": true,
+        "id": "main"
+      }
+    ],
+    "cron": {
+      "enabled_count": 0,
+      "job_count": 0
+    },
+    "devices": {
+      "paired_count": 2,
+      "pending_count": 0,
+      "roles": [
+        "operator"
+      ]
+    },
+    "models": [
+      {
+        "available": false,
+        "context_window": 200000,
+        "key": "anthropic/claude-opus-4-5",
+        "local": false
+      }
+    ],
+    "plugins": [
+      {
+        "enabled": false,
+        "id": "bluebubbles",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "copilot-proxy",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "diagnostics-otel",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "discord",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "feishu",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "google-antigravity-auth",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "google-gemini-cli-auth",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "googlechat",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "imessage",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "line",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "llm-task",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "lobster",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "matrix",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "mattermost",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": true,
+        "id": "memory-core",
+        "status": "loaded",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "memory-lancedb",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "minimax-portal-auth",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "msteams",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "nextcloud-talk",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "nostr",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "open-prose",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "qwen-portal-auth",
+        "status": "disabled",
+        "version": null
+      },
+      {
+        "enabled": false,
+        "id": "signal",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "slack",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "telegram",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "tlon",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "twitch",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "voice-call",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "whatsapp",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "zalo",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      },
+      {
+        "enabled": false,
+        "id": "zalouser",
+        "status": "disabled",
+        "version": "2026.2.3-1"
+      }
+    ],
+    "status": "ready"
+  },
+  "providers": {
+    "anthropic": {
+      "credential_configured": false
+    },
+    "gemini": {
+      "credential_configured": false
+    },
+    "groq": {
+      "credential_configured": false
+    },
+    "kimi": {
+      "credential_configured": false
+    },
+    "openai": {
+      "credential_configured": false
+    },
+    "openrouter": {
+      "credential_configured": false
+    }
+  },
+  "repositories": [
+    {
+      "branch": "main",
+      "changed_files": [
+        "windsurfinabox"
+      ],
+      "dirty": true,
+      "head": "84b111e5957711f4988277f435f9f22d7c04b919",
+      "path": "/Users/bkh223/Documents/GitHub/agent-engineers",
+      "status": "ready"
+    },
+    {
+      "branch": "main",
+      "changed_files": [],
+      "dirty": false,
+      "head": "13b2b98a6f24e1282a387ea9e0017d0fae642fc7",
+      "path": "/Users/bkh223/Documents/GitHub/my-research-mcp-server",
+      "status": "ready"
+    },
+    {
+      "branch": null,
+      "changed_files": [
+        ".gitignore",
+        "MIGRATION_SPEC.md",
+        "README.md",
+        "TODO.md",
+        "USER_ACTIONS.md",
+        "bin/",
+        "inventories/",
+        "pyproject.toml",
+        "src/",
+        "tests/"
+      ],
+      "dirty": true,
+      "head": null,
+      "path": "/Users/bkh223/Documents/GitHub/agent-control-plane-infra",
+      "status": "ready"
+    },
+    {
+      "branch": "main",
+      "changed_files": [],
+      "dirty": false,
+      "head": "9943ae39d70883442fe7d441097a7d25882680e3",
+      "path": "/Users/bkh223/Documents/GitHub/openclaw-ecc-orchestrator",
+      "status": "ready"
+    }
+  ],
+  "runners": {
+    "claude": {
+      "executable": "/usr/local/bin/claude",
+      "exit_code": 0,
+      "status": "ready",
+      "version": "2.1.39 (Claude Code)"
+    },
+    "codex": {
+      "executable": "/Users/bkh223/.nvm/versions/node/v22.22.0/bin/codex",
+      "exit_code": 1,
+      "status": "error",
+      "version": "file:///Users/bkh223/.nvm/versions/node/v22.22.0/lib/node_modules/@openai/codex/bin/codex.js:100"
+    },
+    "gemini": {
+      "executable": "/usr/local/bin/gemini",
+      "exit_code": 0,
+      "status": "ready",
+      "version": "0.19.4"
+    },
+    "git": {
+      "executable": "/usr/local/bin/git",
+      "exit_code": 0,
+      "status": "ready",
+      "version": "git version 2.51.2"
+    },
+    "groq": {
+      "executable": null,
+      "status": "missing",
+      "version": null
+    },
+    "kimi": {
+      "executable": null,
+      "status": "missing",
+      "version": null
+    },
+    "node": {
+      "executable": "/usr/local/bin/node",
+      "exit_code": 0,
+      "status": "ready",
+      "version": "v25.2.1"
+    },
+    "openclaw": {
+      "executable": "/Users/bkh223/.nvm/versions/node/v22.22.0/bin/openclaw",
+      "exit_code": 0,
+      "status": "ready",
+      "version": "2026.2.3-1"
+    },
+    "python3": {
+      "executable": "/usr/local/bin/python3",
+      "exit_code": 0,
+      "status": "ready",
+      "version": "Python 3.13.7"
+    }
+  },
+  "schema_version": "1.0"
+}

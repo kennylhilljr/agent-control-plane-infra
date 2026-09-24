@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.token
+backups/
+artifacts/
+reports/private/
+state/
+tmp/
+.DS_Store
+

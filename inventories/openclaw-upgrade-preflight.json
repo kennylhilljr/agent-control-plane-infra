@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "collected_on": "2026-09-24",
+  "current_version": "2026.2.3-1",
+  "install_method": "pnpm",
+  "channel": "stable",
+  "latest_reported_version": "2026.9.6",
+  "gateway_reachable": true,
+  "doctor_exit_code": 0,
+  "doctor": {
+    "agents": 1,
+    "eligible_skills": 59,
+    "missing_skill_requirements": 41,
+    "loaded_plugins": 1,
+    "disabled_plugins": 30,
+    "plugin_errors": 0
+  },
+  "security_audit": {
+    "critical": 0,
+    "warnings": 1,
+    "info": 1,
+    "warning_titles": [
+      "Reverse proxy headers are not trusted"
+    ]
+  },
+  "preexisting_findings": [
+    "The sole recorded session references a missing transcript; upgrade verification must not treat that transcript as migration loss."
+  ],
+  "rollback_checkpoint": "/Users/bkh223/AgentPlatformBackups/openclaw-20260924T052012.596577Z",
+  "upgrade_target": "2026.8.1",
+  "upgrade_approved": false
+}
