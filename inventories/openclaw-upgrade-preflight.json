@@ -28,5 +28,5 @@
   ],
   "rollback_checkpoint": "/Users/bkh223/AgentPlatformBackups/openclaw-20260924T052012.596577Z",
   "upgrade_target": "2026.8.1",
-  "upgrade_approved": false
+  "upgrade_approved": true
 }

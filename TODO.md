@@ -32,10 +32,12 @@ Legend:
 - [x] **AUTO** Run current-version doctor and upgrade preflight.
   Report: `inventories/openclaw-upgrade-preflight.json`; gateway reachable,
   zero critical security findings, one pre-existing missing transcript.
-- [ ] **APPROVAL** Upgrade from `2026.2.3-1` to pinned `2026.8.1`.
-- [ ] **AUTO** Validate configuration migrations and Gateway startup.
-- [ ] **AUTO** Verify Control UI, sessions, devices, jobs, and plugins.
-- [ ] **AUTO** Execute and verify rollback rehearsal.
+- [x] **APPROVAL** Upgrade from `2026.2.3-1` to pinned `2026.8.1`.
+- [x] **AUTO** Validate configuration migrations and Gateway startup.
+- [x] **AUTO** Verify Control UI, sessions, devices, jobs, and plugins.
+  Validation: `inventories/openclaw-2026.8.1-validation.json`.
+- [x] **AUTO** Execute and verify rollback rehearsal.
+  Native archive restored to a fresh staging directory: 344 entries, 232 files.
 - [ ] **APPROVAL** Select later stable version after release-channel review.
 - [ ] **AUTO** Upgrade to selected current stable and repeat verification.
 

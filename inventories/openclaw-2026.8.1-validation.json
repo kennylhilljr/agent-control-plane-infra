@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0",
+  "validated_on": "2026-09-24",
+  "version": "2026.8.1",
+  "build": "ea80657",
+  "runtime": {
+    "node_version": "22.22.3",
+    "installation": "nvm",
+    "login_shell_resolves_target": true
+  },
+  "configuration": {
+    "cli_valid": true,
+    "daemon_valid": true,
+    "migration_applied": true,
+    "legacy_device_identity_imported": true
+  },
+  "gateway": {
+    "running": true,
+    "rpc_reachable": true,
+    "bind": "loopback",
+    "control_ui_http_status": 200,
+    "version": "2026.8.1",
+    "plugin_version_drift": false
+  },
+  "state": {
+    "agent_count": 1,
+    "session_count": 3,
+    "paired_device_count": 2,
+    "pending_device_count": 0,
+    "plugin_count": 59,
+    "enabled_plugin_count": 40,
+    "plugin_error_count": 0,
+    "scheduled_job_count": 3,
+    "scheduled_jobs": [
+      "Memory Dreaming Promotion",
+      "heartbeat-main",
+      "skill-collection-review-main"
+    ]
+  },
+  "security": {
+    "critical": 0,
+    "warnings": 1,
+    "warning_titles": [
+      "Reverse proxy headers are not trusted"
+    ],
+    "migration_actions": [
+      "Move plaintext gateway tokens to SecretRefs.",
+      "Disable legacy browser relay authentication after clients support v2.",
+      "Configure a command owner before enabling privileged multiplayer commands."
+    ]
+  },
+  "backups": {
+    "pre_upgrade_checkpoint": "/Users/bkh223/AgentPlatformBackups/openclaw-20260924T052012.596577Z",
+    "post_upgrade_archive": "/Users/bkh223/AgentPlatformBackups/2026-09-24T02-59-37.315-04-00-openclaw-backup.tar.gz",
+    "post_upgrade_archive_verified": true,
+    "rollback_rehearsal_target": "/Users/bkh223/AgentPlatformBackups/rollback-rehearsal-2026.8.1",
+    "rollback_rehearsal_entry_count": 344,
+    "rollback_rehearsal_file_count": 232,
+    "rollback_rehearsal_verified": true
+  },
+  "result": "passed_with_follow_up_security_actions"
+}
