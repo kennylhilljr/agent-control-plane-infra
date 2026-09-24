@@ -46,14 +46,29 @@ Legend:
 
 ## Phase 2 — ECC installation
 
-- [ ] **MANUAL** Choose Claude ECC scope and hook profile.
-- [ ] **APPROVAL** Install ECC once in Claude Code.
-- [ ] **AUTO** Verify Claude plugin inventory and ECC doctor.
-- [ ] **APPROVAL** Install ECC once in Codex.
-- [ ] **AUTO** Verify Codex plugin inventory and ECC audit.
+- [x] **MANUAL** Choose Claude ECC scope and hook profile.
+  Chosen 2026-09-24: `user` scope, `standard` hook profile.
+- [x] **APPROVAL** Install ECC once in Claude Code.
+  Native `ecc@ecc` 2.2.2, user scope, enabled; the only installed Claude plugin.
+- [x] **AUTO** Verify Claude plugin inventory and ECC doctor.
+  Evidence: `inventories/ecc-2.2.2-verification.json`. Plugin list and
+  `claude plugin validate` pass; ECC doctor finds no install-state because it
+  does not cover native plugins, so no doctor pass is claimed.
+- [x] **APPROVAL** Install ECC once in Codex.
+  Native `ecc@ecc` 2.2.2 from the `ecc` marketplace, installed and enabled.
+- [x] **AUTO** Verify Codex plugin inventory and ECC audit.
+  Plugin list shows exactly one enabled `ecc@ecc` 2.2.2. Codex has no plugin
+  audit command and ECC doctor does not cover native plugins; no audit pass claimed.
 - [ ] **MANUAL** Add Kimi credential to approved secret storage.
-- [ ] **APPROVAL** Install ECC project surface for Kimi if retained.
-- [ ] **AUTO** Verify no duplicate/manual/legacy ECC installations.
+- [x] **APPROVAL** Install ECC project surface for Kimi if retained.
+  `openclaw-ecc-orchestrator/.kimi-code`, `ecc-universal` 2.2.1, profile `core`;
+  hooks skipped by the adapter. ECC doctor for the kimi target: 1 ok, 0 issues.
+- [~] **AUTO** Verify no duplicate/manual/legacy ECC installations.
+  Native installs are unique and both legacy Skillfish `everything-claude-code`
+  directories were archived to
+  `/Users/bkh223/AgentPlatformBackups/skillfish-ecc-legacy-20260924T072733Z`.
+  Open: 15 per-skill manual Skillfish ECC copies remain in each of
+  `~/.claude/skills` and `~/.codex/skills`; archiving them needs an operator decision.
 
 ## Phase 3 — Runner certification
 

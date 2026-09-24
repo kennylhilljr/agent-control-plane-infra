@@ -34,13 +34,20 @@ validation, and verification.
 2. Choose the Claude ECC hook profile after reviewing exactly what it runs.
 3. Approve Claude and Codex plugin trust prompts.
 4. Do not install ECC through a second method after native installation.
+5. Decide whether to archive the 15 remaining per-skill manual Skillfish copies
+   of ECC skills in each of `~/.claude/skills` and `~/.codex/skills` (listed in
+   `inventories/ecc-2.2.2-verification.json`). The two `everything-claude-code`
+   umbrella directories were already archived on 2026-09-24.
 
-Current dry-run recommendation: Claude `user` scope with `standard` hooks,
-native Codex plugin, and Kimi managed project files in
-`openclaw-ecc-orchestrator/.kimi-code`. The standard Claude hook profile may
+**Approved and installed 2026-09-24:** Claude `user` scope with the `standard`
+hook profile, the native Codex plugin, and Kimi managed project files in
+`openclaw-ecc-orchestrator/.kimi-code` (profile `core`; hooks skipped because
+the Kimi adapter does not support them). Evidence:
+`inventories/ecc-2.2.2-verification.json`. The standard Claude hook profile may
 modify source files, manage processes, send transcript-derived text to an
 external LLM, probe MCP services, enforce operation policy, and persist
-governance/cost records. It remains uninstalled pending explicit approval.
+governance/cost records. The Kimi credential is still required; see
+Credentials below.
 
 ## Credentials
 

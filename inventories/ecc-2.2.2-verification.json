@@ -1,0 +1,124 @@
+{
+  "schema_version": "1.0",
+  "validated_on": "2026-09-24",
+  "started_at": "2026-09-24T07:25:54Z",
+  "completed_at": "2026-09-24T07:28:14Z",
+  "runtime": {
+    "node_version": "24.16.0",
+    "installation": "nvm",
+    "shell_preamble": "source ~/.nvm/nvm.sh && nvm use default",
+    "command_bound_seconds": 60
+  },
+  "decisions": {
+    "approved_on": "2026-09-24",
+    "claude_scope": "user",
+    "claude_hook_profile": "standard",
+    "codex_surface": "native-plugin",
+    "kimi_surface": "project"
+  },
+  "commands": [
+    {"command": "claude --version", "exit_code": 0, "timed_out": false},
+    {"command": "claude plugin list --json", "exit_code": 0, "timed_out": false},
+    {"command": "claude plugin --help", "exit_code": 0, "timed_out": false},
+    {"command": "claude plugin validate <ecc 2.2.2 install path>", "exit_code": 0, "timed_out": false},
+    {"command": "claude plugin details ecc@ecc", "exit_code": 0, "timed_out": false},
+    {"command": "codex --version", "exit_code": 0, "timed_out": false},
+    {"command": "codex plugin list --json", "exit_code": 0, "timed_out": false},
+    {"command": "codex plugin --help", "exit_code": 0, "timed_out": false},
+    {"command": "node <ecc 2.2.2>/scripts/doctor.js --target claude --json", "exit_code": 0, "timed_out": false},
+    {"command": "node <ecc 2.2.2>/scripts/doctor.js --target codex --json", "exit_code": 0, "timed_out": false},
+    {"command": "node <ecc-universal 2.2.1>/scripts/doctor.js --target kimi --json (cwd openclaw-ecc-orchestrator)", "exit_code": 0, "timed_out": false}
+  ],
+  "harnesses": {
+    "claude": {
+      "version": "2.1.281 (Claude Code)",
+      "non_interactive_hang_observed": false,
+      "ecc_plugin": {
+        "id": "ecc@ecc",
+        "version": "2.2.2",
+        "enabled": true,
+        "scope": "user",
+        "installed_at": "2026-09-24T07:16:28.772Z",
+        "install_path": "/Users/bkh223/.claude/plugins/cache/ecc/ecc/2.2.2",
+        "bundled_mcp_servers": ["chrome-devtools"]
+      },
+      "installed_plugin_count": 1,
+      "ecc_install_count": 1,
+      "hooks": {
+        "profile": "standard",
+        "profile_source": "ECC default; ECC_HOOK_PROFILE is not set in Claude settings env or the shell",
+        "events": ["PreToolUse", "PreCompact", "SessionStart", "PostToolUse", "PostToolUseFailure", "Stop", "SessionEnd"]
+      },
+      "component_inventory": {"skills": 386, "agents": 68, "hook_events": 7, "mcp_servers": 1},
+      "projected_always_on_tokens": 29104,
+      "manifest_validation": "passed"
+    },
+    "codex": {
+      "version": "codex-cli 0.158.0-alpha.7",
+      "ecc_plugin": {
+        "id": "ecc@ecc",
+        "version": "2.2.2",
+        "enabled": true,
+        "installed": true,
+        "scope": "user (~/.codex/config.toml; Codex reports no scope field)",
+        "marketplace": "ecc",
+        "marketplace_source": "https://github.com/affaan-m/ECC.git",
+        "auth_policy": "ON_INSTALL"
+      },
+      "installed_plugin_count": 20,
+      "ecc_install_count": 1
+    },
+    "kimi": {
+      "install_state_path": "/Users/bkh223/Documents/GitHub/openclaw-ecc-orchestrator/.kimi-code/ecc-install-state.json",
+      "schema_version": "ecc.install.v1",
+      "installed_at": "2026-09-24T07:17:12.337Z",
+      "target": {"id": "kimi-project", "target": "kimi", "kind": "project", "root": "/Users/bkh223/Documents/GitHub/openclaw-ecc-orchestrator/.kimi-code"},
+      "profile": "core",
+      "package": "ecc-universal",
+      "package_version": "2.2.1",
+      "manifest_version": 1,
+      "selected_modules": ["rules-core", "agents-core", "commands-core", "platform-configs", "skill-unified-memory", "workflow-quality"],
+      "skipped_modules": ["hooks-runtime"],
+      "managed_operation_count": 477,
+      "hooks_skipped_note": "hooks-runtime was skipped because the Kimi adapter does not support hooks; hookConsent is null.",
+      "user_level_surface_present": false,
+      "credential_configured": false
+    }
+  },
+  "doctor_audit": {
+    "harness_cli_doctor_available": false,
+    "harness_cli_note": "Neither `claude plugin` nor `codex plugin` exposes a doctor or audit subcommand.",
+    "ecc_doctor_script": "scripts/doctor.js (read-only: diagnoses drift in ECC manifest install-state files)",
+    "claude": {"exit_code": 0, "checked": 0, "result": "no-install-state", "note": "Expected for a native plugin install; also confirms no manifest-based (manual installer) ECC install for Claude. Doctor does not validate native plugins, so `claude plugin validate` was used instead and passed."},
+    "codex": {"exit_code": 0, "checked": 0, "result": "no-install-state", "note": "Expected for a native plugin install; also confirms no manifest-based ECC install for Codex. No native Codex plugin audit exists; verification rests on plugin list only."},
+    "kimi": {"exit_code": 0, "checked": 1, "ok": 1, "warnings": 0, "errors": 0, "result": "passed", "note": "Run with the same ecc-universal 2.2.1 package used for the install, from the cached npx copy; nothing new was installed and the runtime repo git status was unchanged."},
+    "harness_audit_note": "ECC scripts/harness-audit.js is a repository quality rubric, not an installation audit, and was not run."
+  },
+  "duplicate_install_check": {
+    "claude_native_ecc_count": 1,
+    "codex_native_ecc_count": 1,
+    "kimi_project_surface_count": 1,
+    "legacy_umbrella_skill_dirs_before": ["~/.claude/skills/everything-claude-code", "~/.codex/skills/everything-claude-code"],
+    "legacy_umbrella_skill_dirs_after": [],
+    "remaining_manual_skillfish_ecc_skills": {
+      "claude_count": 15,
+      "codex_count": 15,
+      "names": ["agentic-engineering", "backend-patterns", "claude-api", "coding-standards", "deep-research", "dmux-workflows", "eval-harness", "exa-search", "frontend-patterns", "postgres-patterns", "security-review", "strategic-compact", "tdd-workflow", "verification-loop", "x-api"],
+      "marker": ".skillfish.json with upstream affaan-m/everything-claude-code and source manual",
+      "action": "none; outside the approved archive scope, requires an operator decision"
+    },
+    "result": "native installs unique; 15 per-skill manual Skillfish ECC copies remain in each of Claude and Codex"
+  },
+  "skillfish_archive": {
+    "archive_dir": "/Users/bkh223/AgentPlatformBackups/skillfish-ecc-legacy-20260924T072733Z",
+    "archive_dir_mode": "0700",
+    "marker_fields": {"version": 2, "name": "everything-claude-code", "upstream": "affaan-m/everything-claude-code", "branch": "main", "path": ".agents/skills/everything-claude-code", "sha": "ebf87afb2b3ed29b4f3274d4ce33bc35c98bee0c", "source": "manual"},
+    "entries": [
+      {"original_path": "/Users/bkh223/.claude/skills/everything-claude-code", "archived_as": "claude-skills-everything-claude-code", "file_count": 3, "tarball_sha256": "58e3f0049092085be0358b38ad888fdf5b8a729637cf5be7cb151a323ea04a2c", "checksum_verified": true, "restore_verified": true, "moved": true},
+      {"original_path": "/Users/bkh223/.codex/skills/everything-claude-code", "archived_as": "codex-skills-everything-claude-code", "file_count": 3, "tarball_sha256": "77b089661b28e4167560a4c8d9b94d54b2278acd865bb09f974ffb1cdfc7f4f9", "checksum_verified": true, "restore_verified": true, "moved": true}
+    ],
+    "method": "tar.gz plus SHA256SUMS, disposable extract comparison, then mv; nothing deleted",
+    "rollback": "See MANIFEST.md in the archive directory for exact mv commands."
+  },
+  "result": "passed-with-followup"
+}
