@@ -129,8 +129,15 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
 - [x] **AUTO** Implement conflict prediction and merge queue.
   Approvals via broker only, bound to plan hash and verified head SHA.
 - [~] **AUTO** Implement OpenClaw progress, approval, and attention events.
-  JSONL event contract and decision inbox done (`docs/openclaw-events.md`);
-  the OpenClaw-side plugin that consumes them is not written yet.
+  JSONL event contract and decision inbox done (`docs/openclaw-events.md`).
+  Operator CLI done (`docs/cli.md`). OpenClaw plugin built in
+  `openclaw-ecc-orchestrator/integrations/openclaw-plugin/` (plain JS, no
+  dependencies): 28 unit tests, a Python contract test, and an isolated
+  gateway end-to-end approval all pass. NOT installed in the production
+  gateway; installation is an APPROVAL step (see the plugin README).
+  Open: the runtime needs a standing inbox processor so plugin decisions
+  apply without running `approvals approve`; `decided_by` records the shared
+  owner profile until per-person OpenClaw sign-in exists (Phase 5).
 - [x] **AUTO** Test restart/resume and conductor handoff.
   `tests/test_resume_integration.py` covers success, failure, cancellation,
   reassignment, conflict, budget exhaustion, restart, and conductor change.
