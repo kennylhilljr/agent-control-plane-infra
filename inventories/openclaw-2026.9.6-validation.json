@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "validated_on": "2026-09-24",
+  "release_notes": "https://docs.openclaw.ai/releases/2026.9.6",
+  "version": "2026.9.6",
+  "build": "eb377ac",
+  "runtime": {
+    "node_version": "24.16.0",
+    "installation": "nvm",
+    "login_shell_resolves_target": true
+  },
+  "configuration": {
+    "cli_valid": true,
+    "daemon_valid": true,
+    "state_migrations": [
+      "Moved Skill Workshop ownership to per-agent directories (v16).",
+      "Recorded prepared worker ownership and one-use lifecycle (v17)."
+    ]
+  },
+  "gateway": {
+    "running": true,
+    "rpc_reachable": true,
+    "control_ui_http_status": 200,
+    "version": "2026.9.6",
+    "plugin_version_drift": false
+  },
+  "state": {
+    "agent_count": 1,
+    "session_count": 3,
+    "paired_device_count": 2,
+    "pending_device_count": 0,
+    "plugin_count": 63,
+    "enabled_plugin_count": 42,
+    "plugin_error_count": 0,
+    "scheduled_job_count": 3
+  },
+  "security": {
+    "critical": 0,
+    "warnings": 1,
+    "warning_titles": [
+      "Reverse proxy headers are not trusted"
+    ],
+    "secrets_audit_status": "clean",
+    "plaintext_secret_count": 0,
+    "unresolved_secret_ref_count": 0,
+    "legacy_browser_relay_auth": false,
+    "command_owner_configured": false,
+    "command_owner_note": "Deferred until the operator chooses a channel identity."
+  },
+  "backups": {
+    "pre_upgrade_archive": "/Users/bkh223/AgentPlatformBackups/2026-09-24T03-07-48.751-04-00-openclaw-backup.tar.gz",
+    "post_upgrade_archive": "/Users/bkh223/AgentPlatformBackups/2026-09-24T03-10-08.826-04-00-openclaw-backup.tar.gz",
+    "post_upgrade_archive_verified": true,
+    "rollback_rehearsal_target": "/Users/bkh223/AgentPlatformBackups/rollback-rehearsal-2026.9.6",
+    "rollback_rehearsal_entry_count": 353,
+    "rollback_rehearsal_verified": true
+  },
+  "result": "passed"
+}

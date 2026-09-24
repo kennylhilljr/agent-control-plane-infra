@@ -22,7 +22,8 @@ validation, and verification.
 3. Confirm that critical historical sessions and scheduled jobs are visible
    after upgrade.
 4. Approve or reject the later move from `2026.8.1` to the selected current
-   stable release after its release-channel review.
+   stable release after its release-channel review. **Approved and completed
+   2026-09-24:** OpenClaw `2026.9.6`.
 
 ## ECC choices
 

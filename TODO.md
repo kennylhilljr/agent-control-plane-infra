@@ -38,8 +38,11 @@ Legend:
   Validation: `inventories/openclaw-2026.8.1-validation.json`.
 - [x] **AUTO** Execute and verify rollback rehearsal.
   Native archive restored to a fresh staging directory: 344 entries, 232 files.
-- [ ] **APPROVAL** Select later stable version after release-channel review.
-- [ ] **AUTO** Upgrade to selected current stable and repeat verification.
+- [x] **APPROVAL** Select later stable version after release-channel review.
+  Selected `2026.9.6` after reviewing the official release notes and runtime requirements.
+- [x] **AUTO** Upgrade to selected current stable and repeat verification.
+  Validation: `inventories/openclaw-2026.9.6-validation.json`; native rollback
+  rehearsal restored 353 entries successfully.
 
 ## Phase 2 — ECC installation
 
