@@ -34,10 +34,10 @@ validation, and verification.
 2. Choose the Claude ECC hook profile after reviewing exactly what it runs.
 3. Approve Claude and Codex plugin trust prompts.
 4. Do not install ECC through a second method after native installation.
-5. Decide whether to archive the 15 remaining per-skill manual Skillfish copies
-   of ECC skills in each of `~/.claude/skills` and `~/.codex/skills` (listed in
-   `inventories/ecc-2.2.2-verification.json`). The two `everything-claude-code`
-   umbrella directories were already archived on 2026-09-24.
+5. **Decided 2026-09-24:** archive the 14 per-skill manual Skillfish ECC copies
+   that duplicate native ECC 2.2.2 in `~/.claude/skills` and `~/.codex/skills`;
+   keep `claude-api`, which native ECC does not provide. Archived to
+   `/Users/bkh223/AgentPlatformBackups/skillfish-ecc-per-skill-20260924T115032Z`.
 
 **Approved and installed 2026-09-24:** Claude `user` scope with the `standard`
 hook profile, the native Codex plugin, and Kimi managed project files in
@@ -64,6 +64,17 @@ Required decisions/actions:
 4. After migration, rotate all provider credentials formerly stored in
    Agent-Engineers `.env`.
 5. Revoke credentials for retired integrations.
+6. Restore Claude Code usage. Phase 3 (2026-09-24): Claude Code 2.1.281 reports
+   logged in (OAuth, first party), but every print mode call, with `haiku` and
+   `sonnet`, fails with "Credit balance is too low" (HTTP 400). Check the
+   account's Max subscription and usage or extra usage credit, or sign in again
+   with the subscription account (`claude auth login`), then rerun
+   `python3 -m openclaw_ecc_orchestrator.runners.certify --runners claude --out <dir>`.
+7. Make `GEMINI_API_KEY` and `GROQ_API_KEY` (and, if Kimi is kept,
+   `MOONSHOT_API_KEY`) available to the orchestrator process from approved
+   secret storage. None is set in the login shell or launchd environment, so
+   Gemini, Groq and Kimi certify as `not_configured`. Rerun certification
+   afterwards; the Phase 3 gate needs two certified economical workers.
 
 ## Multiplayer policy
 
@@ -92,6 +103,13 @@ Required decisions/actions:
 5. Confirm retirement of Windsurf and Pi.
 6. Confirm that direct OpenAI API coding is disabled unless an API-only use case
    is documented.
+7. OpenRouter: write the pinned `openrouter.approved_models` list and an explicit
+   `data_policy` (including whether proprietary source code may be sent) into
+   the orchestrator policy. Until then certification ends `not_configured` with
+   reason `policy_not_approved`, even with a key; its public catalog is reachable.
+8. Codex: the ChatGPT plan hit its usage limit during certification
+   (2026-09-24, reset within minutes). Decide whether the plan's limits suit
+   routine coding volume before Phase 6.
 
 ## Pilot and retirement
 

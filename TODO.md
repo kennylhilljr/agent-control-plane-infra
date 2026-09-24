@@ -63,46 +63,77 @@ Legend:
 - [x] **APPROVAL** Install ECC project surface for Kimi if retained.
   `openclaw-ecc-orchestrator/.kimi-code`, `ecc-universal` 2.2.1, profile `core`;
   hooks skipped by the adapter. ECC doctor for the kimi target: 1 ok, 0 issues.
-- [~] **AUTO** Verify no duplicate/manual/legacy ECC installations.
+- [x] **AUTO** Verify no duplicate/manual/legacy ECC installations.
   Native installs are unique and both legacy Skillfish `everything-claude-code`
   directories were archived to
   `/Users/bkh223/AgentPlatformBackups/skillfish-ecc-legacy-20260924T072733Z`.
-  Open: 15 per-skill manual Skillfish ECC copies remain in each of
-  `~/.claude/skills` and `~/.codex/skills`; archiving them needs an operator decision.
+  Operator approved 2026-09-24: 14 per-skill manual Skillfish ECC copies that
+  duplicate native ECC 2.2.2 were archived from each of `~/.claude/skills` and
+  `~/.codex/skills` to
+  `/Users/bkh223/AgentPlatformBackups/skillfish-ecc-per-skill-20260924T115032Z`
+  (checksummed tarballs, MANIFEST.md with rollback). `claude-api` was kept
+  because native ECC does not provide it, so it is not a duplicate.
 
 ## Phase 3 — Runner certification
 
-- [ ] **AUTO** Diagnose Claude Code non-interactive hang.
-- [ ] **AUTO** Certify Claude read/edit/test/commit/cancel workflow.
+- [!] **AUTO** Diagnose Claude Code non-interactive hang.
+  Blocker: no hang in 3 bounded runs (stdin closed, `--permission-prompts none`, 3 to 63 s), but every call failed with "Credit balance is too low" (HTTP 400), so a full turn is unobserved; evidence `inventories/runner-certification-2026-09-24.json`.
+- [!] **AUTO** Certify Claude read/edit/test/commit/cancel workflow.
+  Blocker: Claude Code 2.1.281 installed and logged in, but inference, repo exercise and cancellation fail with the credit error; operator must restore Claude usage (see USER_ACTIONS Credentials 6).
 - [x] **AUTO** Repair global Codex CLI or install stable wrapper.
   Installed official `@openai/codex@alpha` (`0.158.0-alpha.7`) in the default
   Node 24 prefix; ChatGPT login and native plugin discovery verified.
-- [ ] **AUTO** Certify Codex read/edit/test/commit/review/cancel workflow.
-- [ ] **AUTO** Certify Gemini API worker; decide whether CLI auth adds value.
-- [ ] **AUTO** Replace retired Groq model with dynamic discovery.
-- [ ] **AUTO** Certify Groq low-cost task and review roles.
-- [ ] **AUTO** Certify OpenRouter approved fallback models and data policy.
+- [~] **AUTO** Certify Codex read/edit/test/commit/review/cancel workflow.
+  Certified 2026-09-24 (expires 2026-10-01): codex-cli 0.158.0-alpha.7, `gpt-6-luna` from the live catalog, all 7 checks pass incl. failing-unittest fix, commit and process-group cancel; the review role is not yet exercised.
+- [!] **AUTO** Certify Gemini API worker; decide whether CLI auth adds value.
+  Blocker: `GEMINI_API_KEY` is not in the login shell or launchd environment, so the runner is `not_configured`; Gemini CLI 0.19.4 installed, CLI auth not assessed.
+- [!] **AUTO** Replace retired Groq model with dynamic discovery.
+  Blocker: live catalog selection by pattern (no hard-coded id) is implemented and unit tested, but `GROQ_API_KEY` is not in the environment, so no live selection ran.
+- [!] **AUTO** Certify Groq low-cost task and review roles.
+  Blocker: `GROQ_API_KEY` not in the environment; runner `not_configured`.
+- [!] **AUTO** Certify OpenRouter approved fallback models and data policy.
+  Blocker: `policy_not_approved` (no approved models or data policy; no key in the environment either); public catalog reachable, HTTP 200, 458 models, no key sent.
 - [ ] **MANUAL** Configure Kimi credential.
 - [ ] **AUTO** Benchmark Kimi against Gemini on long-context tasks.
 - [ ] **APPROVAL** Retain or retire Kimi based on benchmark.
-- [ ] **AUTO** Remove Windsurf and Pi from all active inventories and routes.
-- [ ] **AUTO** Disable routine direct OpenAI API coding route.
+- [x] **AUTO** Remove Windsurf and Pi from all active inventories and routes.
+  Runtime registry, adapters, catalog and certified-record filter reject both in any case; this repo has no routes and its inventory runner list excludes them (Agent-Engineers is legacy, not edited).
+- [x] **AUTO** Disable routine direct OpenAI API coding route.
+  Runtime rejects `openai`, `openai-api`, `openai_api`, `openai-api-coding` everywhere; this repo has no routes, `openai` appears only as a credential presence field for rotation.
 
 ## Phase 4 — Orchestrator runtime
 
-- [ ] **AUTO** Define and test task, handoff, routing, status, and budget schemas.
-- [ ] **AUTO** Implement DAG validation and durable run state.
-- [ ] **AUTO** Implement worktree creation, ownership, and safe cleanup.
-- [ ] **AUTO** Implement native runner adapters.
-- [ ] **AUTO** Implement dynamic model discovery and readiness probes.
-- [ ] **AUTO** Implement cost-aware task classification.
-- [ ] **AUTO** Implement evidence-based escalation and circuit breakers.
-- [ ] **AUTO** Implement process streaming, timeout, and cancellation.
-- [ ] **AUTO** Implement quality gates and structured verification results.
-- [ ] **AUTO** Implement independent reviewer assignment.
-- [ ] **AUTO** Implement conflict prediction and merge queue.
-- [ ] **AUTO** Implement OpenClaw progress, approval, and attention events.
-- [ ] **AUTO** Test restart/resume and conductor handoff.
+Runtime lives in `openclaw-ecc-orchestrator` (Python 3.11+, standard library
+only, uncommitted as of 2026-09-24). Suite: 527 unittest tests, run on this
+Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
+4 medium, and 4 low issues; all were fixed with regression tests before sync.
+
+- [x] **AUTO** Define and test task, handoff, routing, status, and budget schemas.
+  `schemas.py` (authoritative) plus 8 JSON Schema files in `schemas/`.
+- [x] **AUTO** Implement DAG validation and durable run state.
+  `runs/`: atomic snapshot, flock, append-only JSONL log, lease renewal.
+- [x] **AUTO** Implement worktree creation, ownership, and safe cleanup.
+  `worktrees/`: refuses unique work unless bundled; shared git state guard.
+- [~] **AUTO** Implement native runner adapters.
+  Probe adapters exist for Claude, Codex, Gemini, Groq, OpenRouter, Kimi;
+  live invocation flags are unconfirmed until Phase 3 certification runs.
+- [~] **AUTO** Implement dynamic model discovery and readiness probes.
+  Implemented and tested with fakes; no live catalog refresh has run yet.
+- [x] **AUTO** Implement cost-aware task classification.
+- [x] **AUTO** Implement evidence-based escalation and circuit breakers.
+- [x] **AUTO** Implement process streaming, timeout, and cancellation.
+  Minimal env allowlist, process-group kill, single redaction engine.
+- [x] **AUTO** Implement quality gates and structured verification results.
+  Allowlist-first command policy; shell wrappers refused.
+- [x] **AUTO** Implement independent reviewer assignment.
+- [x] **AUTO** Implement conflict prediction and merge queue.
+  Approvals via broker only, bound to plan hash and verified head SHA.
+- [~] **AUTO** Implement OpenClaw progress, approval, and attention events.
+  JSONL event contract and decision inbox done (`docs/openclaw-events.md`);
+  the OpenClaw-side plugin that consumes them is not written yet.
+- [x] **AUTO** Test restart/resume and conductor handoff.
+  `tests/test_resume_integration.py` covers success, failure, cancellation,
+  reassignment, conflict, budget exhaustion, restart, and conductor change.
 
 ## Phase 5 — OpenClaw agents and multiplayer
 

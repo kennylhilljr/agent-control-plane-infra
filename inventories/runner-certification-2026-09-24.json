@@ -1,0 +1,599 @@
+{
+  "schema_version": "1.0",
+  "collected_at": "2026-09-24T12:18:13Z",
+  "phase": "3 runner certification",
+  "host": {
+    "os": "macOS",
+    "python": "3.13.7"
+  },
+  "tool": "python3 -m openclaw_ecc_orchestrator.runners.certify (openclaw-ecc-orchestrator working tree, uncommitted)",
+  "policy_file": null,
+  "policy_note": "No operator policy file exists yet; built in economical defaults were used. OpenRouter has no approved models or data policy.",
+  "gate": {
+    "coding_runners_certified": false,
+    "economical_workers_certified": [],
+    "gate_met": false
+  },
+  "runners": {
+    "claude": {
+      "kind": "coding_cli",
+      "status": "failed",
+      "version": "2.1.281 (Claude Code)",
+      "certified_at": null,
+      "expires_at": null,
+      "model_selection": {
+        "model": "haiku",
+        "source": "default economical alias"
+      },
+      "models": [
+        "haiku"
+      ],
+      "usage": null,
+      "duration_seconds": 69.511,
+      "checks": [
+        {
+          "name": "installed",
+          "status": "pass",
+          "reason": "installed",
+          "duration_seconds": 0.056,
+          "detail": "2.1.281 (Claude Code)"
+        },
+        {
+          "name": "authentication",
+          "status": "pass",
+          "reason": "authenticated",
+          "duration_seconds": 0.283,
+          "detail": "authMethod=[REDACTED] apiProvider=firstParty"
+        },
+        {
+          "name": "live_inference",
+          "status": "fail",
+          "reason": "inference error: Credit balance is too low (HTTP 400)",
+          "duration_seconds": 63.448,
+          "detail": "exit 1"
+        },
+        {
+          "name": "repo_exercise",
+          "status": "fail",
+          "reason": "agent edit error: Credit balance is too low (HTTP 400)",
+          "duration_seconds": 3.1,
+          "detail": "exit 1"
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "fail",
+          "reason": "exited before the cancel point (exit 1)",
+          "duration_seconds": 2.62,
+          "detail": "Credit balance is too low (HTTP 400)"
+        },
+        {
+          "name": "log_inspection",
+          "status": "pass",
+          "reason": "no secret-like content in runner output",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "metadata_capture",
+          "status": "fail",
+          "reason": "model or usage/cost metadata missing",
+          "duration_seconds": 0.0,
+          "detail": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "kind": "diagnostic",
+          "argv_shape": "claude -p --output-format json --model haiku --no-session-persistence --permission-prompts none -- <prompt>, stdin /dev/null, minimal env",
+          "result": "returned in 26 s, exit 1, is_error: Credit balance is too low (HTTP 400); no hang"
+        },
+        {
+          "attempt": 2,
+          "kind": "diagnostic",
+          "argv_shape": "same with --model sonnet --effort low",
+          "result": "returned in 49 s, exit 1, same credit error; no hang"
+        },
+        {
+          "attempt": 3,
+          "kind": "certification",
+          "result": "failed: live_inference, repo_exercise and cancellation all hit the credit error (63 s, 3 s, 3 s); no hang"
+        }
+      ]
+    },
+    "codex": {
+      "kind": "coding_cli",
+      "status": "certified",
+      "version": "codex-cli 0.158.0-alpha.7",
+      "certified_at": "2026-09-24T12:12:55Z",
+      "expires_at": "2026-10-01T12:12:55Z",
+      "model_selection": {
+        "description": "Fast and affordable model for easier tasks.",
+        "listed_models": 7,
+        "model": "gpt-6-luna",
+        "patterns": [
+          "gpt-*-luna",
+          "*-luna",
+          "*mini*"
+        ],
+        "source": "codex debug models"
+      },
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "cost_usd": null,
+        "input_tokens": 21211,
+        "model": "gpt-6-luna",
+        "output_tokens": 5
+      },
+      "duration_seconds": 50.453,
+      "checks": [
+        {
+          "name": "installed",
+          "status": "pass",
+          "reason": "installed",
+          "duration_seconds": 0.061,
+          "detail": "codex-cli 0.158.0-alpha.7"
+        },
+        {
+          "name": "authentication",
+          "status": "pass",
+          "reason": "authenticated",
+          "duration_seconds": 0.066,
+          "detail": "Logged in using ChatGPT"
+        },
+        {
+          "name": "live_inference",
+          "status": "pass",
+          "reason": "inference ok",
+          "duration_seconds": 5.085,
+          "detail": "OK"
+        },
+        {
+          "name": "repo_exercise",
+          "status": "pass",
+          "reason": "read/edit/test/commit exercise passed",
+          "duration_seconds": 14.295,
+          "detail": "1 new commit(s); tests pass on the committed tree"
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "pass",
+          "reason": "cancelled; whole process group gone",
+          "duration_seconds": 30.117,
+          "detail": "2 process(es) in the group at cancel, 0 after"
+        },
+        {
+          "name": "log_inspection",
+          "status": "pass",
+          "reason": "no secret-like content in runner output",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "metadata_capture",
+          "status": "pass",
+          "reason": "model and usage captured",
+          "duration_seconds": 0.0,
+          "detail": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "kind": "diagnostic",
+          "argv_shape": "codex exec --json --ephemeral --skip-git-repo-check --sandbox read-only -C <dir> -m gpt-6-luna -c model_reasoning_effort=\"low\" -- <prompt>",
+          "result": "turn.failed: subscription usage limit reached (reset a few minutes later)"
+        },
+        {
+          "attempt": 2,
+          "kind": "certification",
+          "result": "failed repo_exercise: agent fixed calc.py and tests passed, but workspace-write denied .git/index.lock so it could not commit"
+        },
+        {
+          "attempt": 3,
+          "kind": "certification",
+          "result": "certified after adding --add-dir <repo>/.git for writable runs"
+        }
+      ]
+    },
+    "gemini": {
+      "kind": "api",
+      "status": "not_configured",
+      "version": null,
+      "certified_at": null,
+      "expires_at": null,
+      "model_selection": {
+        "catalog_status": "not_configured",
+        "live_models": 0,
+        "model": null,
+        "patterns": [
+          "gemini-*flash-lite",
+          "gemini-*flash-lite-*",
+          "gemini-*flash",
+          "gemini-*flash-*"
+        ],
+        "source": "live catalog"
+      },
+      "models": [],
+      "usage": null,
+      "duration_seconds": 0.001,
+      "checks": [
+        {
+          "name": "installed",
+          "status": "skip",
+          "reason": "environment variable GEMINI_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "authentication",
+          "status": "skip",
+          "reason": "environment variable GEMINI_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "live_inference",
+          "status": "skip",
+          "reason": "environment variable GEMINI_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "repo_exercise",
+          "status": "skip",
+          "reason": "environment variable GEMINI_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "skip",
+          "reason": "environment variable GEMINI_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "log_inspection",
+          "status": "skip",
+          "reason": "environment variable GEMINI_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "metadata_capture",
+          "status": "skip",
+          "reason": "environment variable GEMINI_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "kind": "certification",
+          "result": "not_configured"
+        }
+      ]
+    },
+    "groq": {
+      "kind": "api",
+      "status": "not_configured",
+      "version": null,
+      "certified_at": null,
+      "expires_at": null,
+      "model_selection": {
+        "catalog_status": "not_configured",
+        "live_models": 0,
+        "model": null,
+        "patterns": [
+          "*instant*",
+          "*-8b*",
+          "*small*",
+          "*mini*"
+        ],
+        "source": "live catalog"
+      },
+      "models": [],
+      "usage": null,
+      "duration_seconds": 0.0,
+      "checks": [
+        {
+          "name": "installed",
+          "status": "skip",
+          "reason": "environment variable GROQ_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "authentication",
+          "status": "skip",
+          "reason": "environment variable GROQ_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "live_inference",
+          "status": "skip",
+          "reason": "environment variable GROQ_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "repo_exercise",
+          "status": "skip",
+          "reason": "environment variable GROQ_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "skip",
+          "reason": "environment variable GROQ_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "log_inspection",
+          "status": "skip",
+          "reason": "environment variable GROQ_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "metadata_capture",
+          "status": "skip",
+          "reason": "environment variable GROQ_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "kind": "certification",
+          "result": "not_configured"
+        }
+      ]
+    },
+    "openrouter": {
+      "kind": "api",
+      "status": "not_configured",
+      "version": null,
+      "certified_at": null,
+      "expires_at": null,
+      "model_selection": {
+        "catalog": {
+          "http_status": 200,
+          "model_count": 458,
+          "reachable": true
+        },
+        "model": null,
+        "source": "policy approved_models"
+      },
+      "models": [],
+      "usage": null,
+      "duration_seconds": 0.514,
+      "checks": [
+        {
+          "name": "installed",
+          "status": "skip",
+          "reason": "policy_not_approved: openrouter requires pinned approved_models and an explicit data_policy",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "authentication",
+          "status": "skip",
+          "reason": "policy_not_approved: openrouter requires pinned approved_models and an explicit data_policy",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "live_inference",
+          "status": "skip",
+          "reason": "policy_not_approved: openrouter requires pinned approved_models and an explicit data_policy",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "repo_exercise",
+          "status": "skip",
+          "reason": "policy_not_approved: openrouter requires pinned approved_models and an explicit data_policy",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "skip",
+          "reason": "policy_not_approved: openrouter requires pinned approved_models and an explicit data_policy",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "log_inspection",
+          "status": "skip",
+          "reason": "policy_not_approved: openrouter requires pinned approved_models and an explicit data_policy",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "metadata_capture",
+          "status": "skip",
+          "reason": "policy_not_approved: openrouter requires pinned approved_models and an explicit data_policy",
+          "duration_seconds": 0.0,
+          "detail": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "kind": "certification",
+          "result": "not_configured"
+        }
+      ]
+    },
+    "kimi": {
+      "kind": "api",
+      "status": "not_configured",
+      "version": null,
+      "certified_at": null,
+      "expires_at": null,
+      "model_selection": {
+        "catalog_status": "not_configured",
+        "live_models": 0,
+        "model": null,
+        "patterns": [
+          "kimi-*",
+          "moonshot-v1-8k*"
+        ],
+        "source": "live catalog"
+      },
+      "models": [],
+      "usage": null,
+      "duration_seconds": 0.0,
+      "checks": [
+        {
+          "name": "installed",
+          "status": "skip",
+          "reason": "environment variable MOONSHOT_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "authentication",
+          "status": "skip",
+          "reason": "environment variable MOONSHOT_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "live_inference",
+          "status": "skip",
+          "reason": "environment variable MOONSHOT_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "repo_exercise",
+          "status": "skip",
+          "reason": "environment variable MOONSHOT_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "skip",
+          "reason": "environment variable MOONSHOT_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "log_inspection",
+          "status": "skip",
+          "reason": "environment variable MOONSHOT_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "metadata_capture",
+          "status": "skip",
+          "reason": "environment variable MOONSHOT_API_KEY is not set",
+          "duration_seconds": 0.0,
+          "detail": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "kind": "certification",
+          "result": "not_configured"
+        }
+      ]
+    }
+  },
+  "credentials": {
+    "method": "environment variable names only, login shell and launchctl; no values read",
+    "checked": [
+      "GEMINI_API_KEY",
+      "GOOGLE_API_KEY",
+      "GROQ_API_KEY",
+      "OPENROUTER_API_KEY",
+      "MOONSHOT_API_KEY",
+      "KIMI_API_KEY",
+      "ANTHROPIC_API_KEY",
+      "OPENAI_API_KEY"
+    ],
+    "present": [],
+    "not_searched": [
+      "Agent-Engineers .env",
+      "OpenClaw secret store",
+      "keychain"
+    ]
+  },
+  "cli_flags_confirmed": {
+    "claude": {
+      "version": "2.1.281 (Claude Code)",
+      "non_interactive": "-p/--print with --output-format text|json|stream-json",
+      "prompts": "--permission-prompts host|none (none denies anything that would prompt)",
+      "permission_modes": [
+        "acceptEdits",
+        "auto",
+        "bypassPermissions",
+        "manual",
+        "dontAsk",
+        "plan"
+      ],
+      "model": "--model <alias or full name>; haiku alias accepted",
+      "effort": "--effort low|medium|high|xhigh|max",
+      "session": "--no-session-persistence",
+      "tools": "--allowedTools/--tools/--disallowedTools, e.g. Bash(git *)",
+      "budget": "--max-budget-usd (print mode only)",
+      "auth_status": "claude auth status [--json (default)|--text]; JSON has loggedIn, authMethod, apiProvider",
+      "working_directory": "process cwd, plus --add-dir",
+      "sandbox": "no OS sandbox flag; --restricted removes command running tools"
+    },
+    "codex": {
+      "version": "codex-cli 0.158.0-alpha.7",
+      "non_interactive": "codex exec [--json JSONL events] [-o last message file]",
+      "model": "-m <slug>; live catalog via codex debug models",
+      "effort": "-c model_reasoning_effort=\"low\"",
+      "sandbox": "-s/--sandbox read-only|workspace-write|danger-full-access; workspace-write keeps .git read only; --add-dir makes an extra dir writable",
+      "session": "--ephemeral",
+      "working_directory": "-C/--cd <dir>",
+      "auth_status": "codex login status",
+      "catalog_models_listed": [
+        "gpt-6-astra",
+        "gpt-6-sol",
+        "gpt-6-luna",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+        "gpt-5.5"
+      ]
+    },
+    "gemini_cli": {
+      "version": "0.19.4",
+      "note": "installed; not used, API runner is the certified path"
+    }
+  },
+  "claude_hang_diagnosis": {
+    "reproduced": false,
+    "finding": "With stdin closed (/dev/null), --permission-prompts none and --no-session-persistence under the minimal env, every print mode call returned within the bound (3 to 63 s; first call of a session spends 25 to 60 s in start up before any API call). All calls failed with 'Credit balance is too low' (HTTP 400), so a full model turn could not be observed.",
+    "likely_historic_causes": "unconfirmed: an open stdin (print mode reads stdin when it is not a TTY) or a permission prompt waiting for an absent host; the adapter now closes stdin and denies prompts"
+  },
+  "findings": [
+    "Claude print mode returns is_error with exit 1 and a result text; the adapter previously counted any result text as success and now fails the check with the CLI's message.",
+    "Codex workspace-write sandbox blocks commits; writable runs now pass --add-dir <repo>/.git.",
+    "Codex reports token usage (turn.completed) but no cost; a one word probe used about 21k input tokens because of the default system prompt and installed skills (Codex also warns that the skills context budget is exceeded).",
+    "python.org Python 3.13 on this Mac has no CA store (CERTIFICATE_VERIFY_FAILED); the runtime now falls back to /etc/ssl/cert.pem with verification on. OpenRouter public catalog reachable afterwards (HTTP 200, 458 models, no key sent)."
+  ],
+  "retired_runners": {
+    "runtime_registry": "windsurf, pi, openai, openai-api, openai_api, openai-api-coding rejected by get_profile, build_registry, get_adapter, fetch_catalog and certified_runners (any case or spacing)",
+    "agent_control_plane_infra": "no routes or runner config; inventory RUNNERS excludes windsurf and pi; openai appears only as a credential presence field for rotation tracking",
+    "agent_engineers": "legacy and read only; not inspected or edited"
+  },
+  "disposable_repositories": "fresh mkdtemp work roots under /tmp, outside all repositories and ~/.openclaw; removed after results were recorded"
+}
