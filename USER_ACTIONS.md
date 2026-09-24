@@ -35,6 +35,13 @@ validation, and verification.
 3. Approve Claude and Codex plugin trust prompts.
 4. Do not install ECC through a second method after native installation.
 
+Current dry-run recommendation: Claude `user` scope with `standard` hooks,
+native Codex plugin, and Kimi managed project files in
+`openclaw-ecc-orchestrator/.kimi-code`. The standard Claude hook profile may
+modify source files, manage processes, send transcript-derived text to an
+external LLM, probe MCP services, enforce operation policy, and persist
+governance/cost records. It remains uninstalled pending explicit approval.
+
 ## Credentials
 
 Enter credentials only through the designated secret manager or local protected

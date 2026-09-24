@@ -59,7 +59,9 @@ Legend:
 
 - [ ] **AUTO** Diagnose Claude Code non-interactive hang.
 - [ ] **AUTO** Certify Claude read/edit/test/commit/cancel workflow.
-- [ ] **AUTO** Repair global Codex CLI or install stable wrapper.
+- [x] **AUTO** Repair global Codex CLI or install stable wrapper.
+  Installed official `@openai/codex@alpha` (`0.158.0-alpha.7`) in the default
+  Node 24 prefix; ChatGPT login and native plugin discovery verified.
 - [ ] **AUTO** Certify Codex read/edit/test/commit/review/cancel workflow.
 - [ ] **AUTO** Certify Gemini API worker; decide whether CLI auth adds value.
 - [ ] **AUTO** Replace retired Groq model with dynamic discovery.
