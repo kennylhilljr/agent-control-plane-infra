@@ -33,8 +33,8 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 Preview and create an owner-only OpenClaw rollback checkpoint:
 
 ```bash
-./bin/agent-platform backup --backup-dir /Users/bkh223/AgentPlatformBackups --dry-run --json
-./bin/agent-platform backup --backup-dir /Users/bkh223/AgentPlatformBackups --json
+./bin/agent-platform backup --backup-dir ~/AgentPlatformBackups --dry-run --json
+./bin/agent-platform backup --backup-dir ~/AgentPlatformBackups --json
 ```
 
 The backup command excludes live logs, writes SHA-256 checksums, rejects unsafe
