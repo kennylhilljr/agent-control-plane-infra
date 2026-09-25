@@ -76,15 +76,15 @@ Legend:
 
 ## Phase 3 — Runner certification
 
-- [!] **AUTO** Diagnose Claude Code non-interactive hang.
-  Blocker: no hang in 3 bounded runs (stdin closed, `--permission-prompts none`, 3 to 63 s), but every call failed with "Credit balance is too low" (HTTP 400), so a full turn is unobserved; evidence `inventories/runner-certification-2026-09-24.json`.
-- [!] **AUTO** Certify Claude read/edit/test/commit/cancel workflow.
-  Blocker: Claude Code 2.1.281 installed and logged in, but inference, repo exercise and cancellation fail with the credit error; operator must restore Claude usage (see USER_ACTIONS Credentials 6).
+- [x] **AUTO** Diagnose Claude Code non-interactive hang.
+  Not reproduced: after the subscription sign-in (2026-09-24) full turns complete (inference 5.5 s, repo exercise 28.8 s) with stdin closed and `--permission-prompts none`; unit runners are now guarded by health monitoring instead of a wall clock kill; evidence `inventories/runner-certification-2026-09-25.json`.
+- [x] **AUTO** Certify Claude read/edit/test/commit/cancel workflow.
+  Certified 2026-09-25 (expires 2026-10-02): Claude Code 2.1.281, `haiku` (claude-haiku-4-5), all 7 checks pass; the cancel check is now event triggered (probe prompt in `stream-json` mode, which needs `--verbose`; group cancelled on the first stream event and proven gone). Codex recertified the same way (expires 2026-10-02).
 - [x] **AUTO** Repair global Codex CLI or install stable wrapper.
   Installed official `@openai/codex@alpha` (`0.158.0-alpha.7`) in the default
   Node 24 prefix; ChatGPT login and native plugin discovery verified.
 - [~] **AUTO** Certify Codex read/edit/test/commit/review/cancel workflow.
-  Certified 2026-09-24 (expires 2026-10-01): codex-cli 0.158.0-alpha.7, `gpt-6-luna` from the live catalog, all 7 checks pass incl. failing-unittest fix, commit and process-group cancel; the review role is not yet exercised.
+  Certified 2026-09-24 (expires 2026-10-01): codex-cli 0.158.0-alpha.7, `gpt-6-luna` from the live catalog, all 7 checks pass incl. failing-unittest fix, commit and process-group cancel; the review role is not yet exercised. Recertified 2026-09-25 (expires 2026-10-02) with the event triggered cancel check (`inventories/runner-certification-2026-09-25.json`).
 - [!] **AUTO** Certify Gemini API worker; decide whether CLI auth adds value.
   Blocker: `GEMINI_API_KEY` is not in the login shell or launchd environment, so the runner is `not_configured`; Gemini CLI 0.19.4 installed, CLI auth not assessed.
 - [!] **AUTO** Replace retired Groq model with dynamic discovery.
@@ -123,6 +123,10 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
 - [x] **AUTO** Implement evidence-based escalation and circuit breakers.
 - [x] **AUTO** Implement process streaming, timeout, and cancellation.
   Minimal env allowlist, process-group kill, single redaction engine.
+  2026-09-25: health monitoring replaced wall clock kills for runners and gates
+  (checks every 120 s of group CPU, output, stream events, worktree and process
+  set; cancel only after 5 flat checks, reason `hung`); `budget.minutes` is
+  advisory (`long_running` attention); `unit.completed` and `unit.health` events.
 - [x] **AUTO** Implement quality gates and structured verification results.
   Allowlist-first command policy; shell wrappers refused.
 - [x] **AUTO** Implement independent reviewer assignment.

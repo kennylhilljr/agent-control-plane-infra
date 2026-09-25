@@ -64,12 +64,10 @@ Required decisions/actions:
 4. After migration, rotate all provider credentials formerly stored in
    Agent-Engineers `.env`.
 5. Revoke credentials for retired integrations.
-6. Restore Claude Code usage. Phase 3 (2026-09-24): Claude Code 2.1.281 reports
-   logged in (OAuth, first party), but every print mode call, with `haiku` and
-   `sonnet`, fails with "Credit balance is too low" (HTTP 400). Check the
-   account's Max subscription and usage or extra usage credit, or sign in again
-   with the subscription account (`claude auth login`), then rerun
-   `python3 -m openclaw_ecc_orchestrator.runners.certify --runners claude --out <dir>`.
+6. Done: Claude Code usage restored on 2026-09-24 by signing in with the Max
+   subscription (subscription sign-in). Claude certified on 2026-09-25 (expires
+   2026-10-02), all 7 checks pass; evidence
+   `inventories/runner-certification-2026-09-25.json`. No action left.
 7. Make `GEMINI_API_KEY` and `GROQ_API_KEY` (and, if Kimi is kept,
    `MOONSHOT_API_KEY`) available to the orchestrator process from approved
    secret storage. None is set in the login shell or launchd environment, so

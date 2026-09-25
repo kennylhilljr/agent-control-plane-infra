@@ -1,0 +1,219 @@
+{
+  "schema_version": "1.0",
+  "collected_at": "2026-09-25T14:55:03Z",
+  "phase": "3 runner certification (coding CLIs rerun after the health monitoring and event triggered cancellation change)",
+  "supersedes_for": {
+    "claude": "runner-certification-2026-09-24.json",
+    "codex": "runner-certification-2026-09-24.json"
+  },
+  "host": {
+    "os": "macOS",
+    "python": "3.13.7"
+  },
+  "tool": "python3 -m openclaw_ecc_orchestrator.runners.certify (openclaw-ecc-orchestrator working tree, uncommitted)",
+  "policy_file": null,
+  "policy_note": "No operator policy file; built in economical defaults (Claude haiku alias, Codex economical pattern from the live catalog). API runners were not rerun; see runner-certification-2026-09-24.json for their not_configured status.",
+  "gate": {
+    "coding_runners_certified": true,
+    "economical_workers_certified": [],
+    "gate_met": false,
+    "note": "the Phase 3 gate also needs at least two certified economical API workers; none has a credential configured"
+  },
+  "cancellation_check": {
+    "method": "event triggered: the ordinary probe prompt (reply OK) in the CLI's streaming output mode; the whole process group is cancelled as soon as the first stream event line arrives on stdout, then proven gone (grandchildren included). No timer, no shell command or long task asked of the model.",
+    "claude_argv_shape": "claude -p --output-format stream-json --no-session-persistence --permission-prompts none --verbose --model haiku -- <probe prompt>, stdin /dev/null, minimal env",
+    "codex_argv_shape": "codex exec --json --ephemeral --skip-git-repo-check --sandbox read-only -C <dir> -m gpt-6-luna -c model_reasoning_effort=\"low\" -- <probe prompt>",
+    "claude_flag_finding": "Claude Code 2.1.281 print mode refuses --output-format stream-json without --verbose (it exits with an error before any model call)",
+    "inconclusive_rule": "a CLI that exits before any stream event is retried up to 2 times, then fails with no_stream_event; neither runner needed a retry",
+    "replaces": "the previous check asked the agent to run sleep 120 and cancelled on a 30 to 60 second timer (--cancel-after, now removed)"
+  },
+  "runners": {
+    "claude": {
+      "kind": "coding_cli",
+      "status": "certified",
+      "version": "2.1.281 (Claude Code)",
+      "certified_at": "2026-09-25T14:54:01Z",
+      "expires_at": "2026-10-02T14:54:01Z",
+      "model_selection": {
+        "model": "haiku",
+        "source": "default economical alias"
+      },
+      "models": [
+        "claude-haiku-4-5-20251001"
+      ],
+      "usage": {
+        "cost_usd": 0.0447216,
+        "input_tokens": 10,
+        "model": "claude-haiku-4-5-20251001",
+        "output_tokens": 44
+      },
+      "duration_seconds": 36.463,
+      "checks": [
+        {
+          "name": "installed",
+          "status": "pass",
+          "reason": "installed",
+          "duration_seconds": 0.119,
+          "detail": "2.1.281 (Claude Code)"
+        },
+        {
+          "name": "authentication",
+          "status": "pass",
+          "reason": "authenticated",
+          "duration_seconds": 0.463,
+          "detail": "subscription sign-in (authMethod claude.ai), provider firstParty"
+        },
+        {
+          "name": "live_inference",
+          "status": "pass",
+          "reason": "inference ok",
+          "duration_seconds": 5.461,
+          "detail": "OK"
+        },
+        {
+          "name": "repo_exercise",
+          "status": "pass",
+          "reason": "read/edit/test/commit exercise passed",
+          "duration_seconds": 28.814,
+          "detail": "1 new commit(s); tests pass on the committed tree"
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "pass",
+          "reason": "cancelled on the first stream event; whole process group gone",
+          "duration_seconds": 1.602,
+          "detail": "first event system/hook_started after 0.759s; 3 process(es) in the group at cancel, 0 after; attempt 1"
+        },
+        {
+          "name": "log_inspection",
+          "status": "pass",
+          "reason": "no secret-like content in runner output",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "metadata_capture",
+          "status": "pass",
+          "reason": "model and usage captured",
+          "duration_seconds": 0.0,
+          "detail": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "kind": "certification",
+          "result": "certified on the first run; cancellation check cancelled on the first stream event (system/hook_started, 0.76 s after start, before any model call) with 3 group processes, 0 after"
+        }
+      ]
+    },
+    "codex": {
+      "kind": "coding_cli",
+      "status": "certified",
+      "version": "codex-cli 0.158.0-alpha.7",
+      "certified_at": "2026-09-25T14:55:03Z",
+      "expires_at": "2026-10-02T14:55:03Z",
+      "model_selection": {
+        "description": "Fast and affordable model for easier tasks.",
+        "listed_models": 7,
+        "model": "gpt-6-luna",
+        "patterns": [
+          "gpt-*-luna",
+          "*-luna",
+          "*mini*"
+        ],
+        "source": "codex debug models"
+      },
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "cost_usd": null,
+        "input_tokens": 21210,
+        "model": "gpt-6-luna",
+        "output_tokens": 5
+      },
+      "duration_seconds": 25.384,
+      "checks": [
+        {
+          "name": "installed",
+          "status": "pass",
+          "reason": "installed",
+          "duration_seconds": 0.065,
+          "detail": "codex-cli 0.158.0-alpha.7"
+        },
+        {
+          "name": "authentication",
+          "status": "pass",
+          "reason": "authenticated",
+          "duration_seconds": 0.056,
+          "detail": "Logged in using ChatGPT"
+        },
+        {
+          "name": "live_inference",
+          "status": "pass",
+          "reason": "inference ok",
+          "duration_seconds": 6.242,
+          "detail": "OK"
+        },
+        {
+          "name": "repo_exercise",
+          "status": "pass",
+          "reason": "read/edit/test/commit exercise passed",
+          "duration_seconds": 17.79,
+          "detail": "1 new commit(s); tests pass on the committed tree"
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "pass",
+          "reason": "cancelled on the first stream event; whole process group gone",
+          "duration_seconds": 0.38,
+          "detail": "first event thread.started after 0.285s; 5 process(es) in the group at cancel, 0 after; attempt 1"
+        },
+        {
+          "name": "log_inspection",
+          "status": "pass",
+          "reason": "no secret-like content in runner output",
+          "duration_seconds": 0.0,
+          "detail": null
+        },
+        {
+          "name": "metadata_capture",
+          "status": "pass",
+          "reason": "model and usage captured",
+          "duration_seconds": 0.0,
+          "detail": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "kind": "certification",
+          "result": "certified on the first run; cancellation check cancelled on the first stream event (thread.started, 0.29 s after start) with 5 group processes, 0 after"
+        }
+      ]
+    }
+  },
+  "claude_usage_restored": "Claude Code is signed in with the Max subscription (subscription sign-in, not an API key); the 2026-09-24 credit balance error no longer occurs.",
+  "claude_hang_diagnosis": {
+    "reproduced": false,
+    "finding": "Full model turns now complete: inference 5.5 s, read/edit/test/commit exercise 28.8 s, all under the minimal env with stdin closed and --permission-prompts none. No hang observed. Unit runners are now protected by health monitoring (cancelled only after repeated checks without any progress signal) instead of a wall clock kill."
+  },
+  "runtime_change": {
+    "health_monitoring": "runners and gates have no wall clock limit; every health.interval_seconds (default 120) the supervisor compares process liveness, process group CPU time, output bytes, stream events, a worktree digest and the process set with the previous check; health.flat_checks_for_hang (default 5) consecutive flat checks cancel the group with reason hung",
+    "events": [
+      "unit.health (on state change)",
+      "unit.completed (every runner exit)",
+      "attention.required reasons suspected_hang, hung_cancelled, long_running"
+    ],
+    "budget_minutes": "advisory: long_running attention at each multiple, never a cancel",
+    "tests": {
+      "python_cloud": "685 run, 1 skipped, OK",
+      "python_mac": "685 run, 2 skipped, OK",
+      "plugin_unit": "29 pass",
+      "plugin_contract": "1 pass",
+      "gitleaks": "no leaks found"
+    }
+  },
+  "disposable_repositories": "fresh mkdtemp work roots under /tmp, outside all repositories and ~/.openclaw; removed after results were recorded"
+}
