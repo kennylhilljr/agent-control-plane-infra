@@ -148,6 +148,9 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
   route and the tail service; only warning is the expected unverified origin
   (`plugins.allow` intentionally unset). Rollback: unset
   `plugins.entries.ecc-orchestrator`, then `plugins.load.paths`.
+  Standing inbox processor done 2026-10-18 (`approvals process-inbox
+  --watch`, launchd agent `local.openclaw-ecc-orchestrator.inbox-processor`,
+  running), so OpenClaw approvals apply without a CLI command.
   Open: the runtime needs a standing inbox processor so plugin decisions
   apply without running `approvals approve`; `decided_by` records the shared
   owner profile until per-person OpenClaw sign-in exists (Phase 5).
@@ -191,7 +194,13 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
 
 - [ ] **AUTO** Add CI, coverage, lint, type, security, secret, and SBOM gates.
 - [ ] **AUTO** Publish operator, incident, backup, restore, and upgrade runbooks.
-- [ ] **AUTO** Schedule recurring runner doctor and model-catalog refresh.
+- [x] **AUTO** Schedule recurring runner doctor and model-catalog refresh.
+  2026-10-18: launchd agent `local.openclaw-ecc-orchestrator.recertify` runs
+  `bin/recertify-weekly` Sundays 09:00 (certification lasts 7 days; each run
+  refreshes the live model catalogs) and notifies the outcome. First launchd
+  run passed with the gate met. Jobs run from a git worktree at
+  `~/.local/share/openclaw-ecc-orchestrator/runtime`, because macOS privacy
+  protection blocks launchd jobs from `~/Documents`.
 - [ ] **AUTO** Add one application repository at a time.
 - [ ] **APPROVAL** Enable remote/cloud workers after security review.
 - [ ] **APPROVAL** Enable experimental Swarm only after DAG reliability target is met.
