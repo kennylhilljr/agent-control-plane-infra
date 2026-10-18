@@ -19,6 +19,7 @@ class BackupResult:
     checkpoint_dir: Path
     archive: Path
     manifest: Path
+    link_count: int = 0
 
 
 class BackupManager:
@@ -31,13 +32,14 @@ class BackupManager:
     def create(self, *, dry_run: bool = False) -> BackupResult:
         if not self.source.is_dir():
             raise FileNotFoundError(f"OpenClaw state directory not found: {self.source}")
-        files = self._source_files()
+        files, links = self._source_entries()
         checkpoint_name = datetime.now(UTC).strftime("openclaw-%Y%m%dT%H%M%S.%fZ")
         checkpoint = self.destination / checkpoint_name
         archive_path = checkpoint / "openclaw-state.tar.gz"
         manifest_path = checkpoint / "manifest.json"
         if dry_run:
-            return BackupResult(False, False, len(files), checkpoint, archive_path, manifest_path)
+            return BackupResult(False, False, len(files), checkpoint, archive_path, manifest_path,
+                                len(links))
 
         self._prepare_destination(checkpoint)
         expected = {str(path.relative_to(self.source)): _sha256(path) for path in files}
@@ -56,23 +58,36 @@ class BackupManager:
             "archive_sha256": _sha256(archive_path),
             "file_count": len(expected),
             "files": expected,
+            # Symbolic links are recorded with their targets, never followed
+            # and never archived, so nothing outside the source is copied.
+            "symlinks": links,
+            "symlink_policy": "recorded-not-followed",
             "restore_verified": True,
         }
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
         manifest_path.chmod(0o600)
-        return BackupResult(True, True, len(files), checkpoint, archive_path, manifest_path)
+        return BackupResult(True, True, len(files), checkpoint, archive_path, manifest_path,
+                            len(links))
 
     def _source_files(self) -> list[Path]:
-        files = []
+        return self._source_entries()[0]
+
+    def _source_entries(self) -> tuple[list[Path], dict[str, str]]:
+        """Regular files to archive, and symbolic links (relative path to
+        target) to record. Links are never followed: rglob does not descend
+        into symlinked directories, and a link's target is read, not opened."""
+        files: list[Path] = []
+        links: dict[str, str] = {}
         for path in self.source.rglob("*"):
             relative = path.relative_to(self.source)
             if relative.parts and relative.parts[0] in self.EXCLUDED_TOP_LEVEL:
                 continue
             if path.is_symlink():
-                raise ValueError(f"Refusing to back up symbolic link: {relative}")
+                links[str(PurePosixPath(*relative.parts))] = os.readlink(path)
+                continue
             if path.is_file():
                 files.append(path)
-        return sorted(files)
+        return sorted(files), dict(sorted(links.items()))
 
     def _prepare_destination(self, checkpoint: Path) -> None:
         if self.destination.exists():

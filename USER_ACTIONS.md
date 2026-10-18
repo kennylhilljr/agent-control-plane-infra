@@ -57,10 +57,12 @@ handoff.
 
 Required decisions/actions:
 
-1. Add or locate the Kimi/Moonshot credential.
+1. Done 2026-10-18: Kimi/Moonshot key stored in the macOS Keychain and the
+   account recharged; Kimi certified on `kimi-k2.7-code`.
 2. Approve the OpenClaw credential scopes for each provider.
-3. Confirm the approved OpenRouter models and whether proprietary source code may
-   be sent to them.
+3. Decided 2026-10-18: OpenRouter is parked (no approved models, no data
+   policy, key removed from the Keychain). Reopen only with pinned models and a
+   written data policy.
 4. After migration, rotate all provider credentials formerly stored in
    Agent-Engineers `.env`.
 5. Revoke credentials for retired integrations.
@@ -68,11 +70,16 @@ Required decisions/actions:
    subscription (subscription sign-in). Claude certified on 2026-09-25 (expires
    2026-10-02), all 7 checks pass; evidence
    `inventories/runner-certification-2026-09-25.json`. No action left.
-7. Make `GEMINI_API_KEY` and `GROQ_API_KEY` (and, if Kimi is kept,
-   `MOONSHOT_API_KEY`) available to the orchestrator process from approved
-   secret storage. None is set in the login shell or launchd environment, so
-   Gemini, Groq and Kimi certify as `not_configured`. Rerun certification
-   afterwards; the Phase 3 gate needs two certified economical workers.
+7. Done 2026-10-18: `GEMINI_API_KEY`, `GROQ_API_KEY` (free tier) and
+   `MOONSHOT_API_KEY` are stored in the macOS login Keychain and loaded only
+   into the orchestrator command by `bin/with-keychain-secrets`. Phase 3 gate
+   met; evidence `inventories/runner-certification-2026-10-18.json`.
+8. Certifications expire after 7 days. Rerun before 2026-10-25 (Claude Code
+   2.1.281 or newer must be first on PATH):
+   `PYTHONPATH=src bin/with-keychain-secrets python3 -m openclaw_ecc_orchestrator.runners.certify --runners claude,codex,gemini,groq,kimi --out <dir>`
+9. Three Claude Code installs exist: `~/.local/bin/claude` (2.1.112, first on
+   PATH), the nvm copy (2.1.281, certified) and a broken `/usr/local/bin/claude`
+   (native binary missing). Keep one, current, first on PATH.
 
 ## Multiplayer policy
 
@@ -101,10 +108,9 @@ Required decisions/actions:
 5. Confirm retirement of Windsurf and Pi.
 6. Confirm that direct OpenAI API coding is disabled unless an API-only use case
    is documented.
-7. OpenRouter: write the pinned `openrouter.approved_models` list and an explicit
-   `data_policy` (including whether proprietary source code may be sent) into
-   the orchestrator policy. Until then certification ends `not_configured` with
-   reason `policy_not_approved`, even with a key; its public catalog is reachable.
+7. OpenRouter: parked by operator decision 2026-10-18 (mostly Claude and Codex
+   in use; Gemini, Groq and Kimi cover economical work). The adapter remains,
+   gated off by policy (`policy_not_approved`).
 8. Codex: the ChatGPT plan hit its usage limit during certification
    (2026-09-24, reset within minutes). Decide whether the plan's limits suit
    routine coding volume before Phase 6.

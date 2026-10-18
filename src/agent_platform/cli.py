@@ -61,6 +61,8 @@ def main(argv: list[str] | None = None) -> int:
             "changed": result.changed,
             "checks": [
                 {"name": "file-enumeration", "status": "passed", "count": result.file_count},
+                {"name": "symlinks-recorded-not-followed", "status": "passed",
+                 "count": result.link_count},
                 {
                     "name": "disposable-restore",
                     "status": "passed" if result.verified else "not-run",

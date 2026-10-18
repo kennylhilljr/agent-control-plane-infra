@@ -76,24 +76,27 @@ Legend:
 
 ## Phase 3 — Runner certification
 
+**Gate met 2026-10-18:** Claude and Codex (coding) plus Gemini, Groq and Kimi (economical) certified in one run, `inventories/runner-certification-2026-10-18.json`. Certifications expire after 7 days (next: 2026-10-25); keys come from the macOS Keychain through `bin/with-keychain-secrets`.
+
 - [x] **AUTO** Diagnose Claude Code non-interactive hang.
   Not reproduced: after the subscription sign-in (2026-09-24) full turns complete (inference 5.5 s, repo exercise 28.8 s) with stdin closed and `--permission-prompts none`; unit runners are now guarded by health monitoring instead of a wall clock kill; evidence `inventories/runner-certification-2026-09-25.json`.
 - [x] **AUTO** Certify Claude read/edit/test/commit/cancel workflow.
-  Certified 2026-09-25 (expires 2026-10-02): Claude Code 2.1.281, `haiku` (claude-haiku-4-5), all 7 checks pass; the cancel check is now event triggered (probe prompt in `stream-json` mode, which needs `--verbose`; group cancelled on the first stream event and proven gone). Codex recertified the same way (expires 2026-10-02).
+  Certified 2026-09-25 (expires 2026-10-02): Claude Code 2.1.281, `haiku` (claude-haiku-4-5), all 7 checks pass; the cancel check is now event triggered (probe prompt in `stream-json` mode, which needs `--verbose`; group cancelled on the first stream event and proven gone). Codex recertified the same way (expires 2026-10-02). Recertified 2026-10-18 (expires 2026-10-25) with Claude Code 2.1.281 first on PATH; a stale `~/.local/bin/claude` 2.1.112 failed with an unknown option until then, and the adapter now enforces a 2.1.281 minimum.
 - [x] **AUTO** Repair global Codex CLI or install stable wrapper.
   Installed official `@openai/codex@alpha` (`0.158.0-alpha.7`) in the default
   Node 24 prefix; ChatGPT login and native plugin discovery verified.
 - [~] **AUTO** Certify Codex read/edit/test/commit/review/cancel workflow.
-  Certified 2026-09-24 (expires 2026-10-01): codex-cli 0.158.0-alpha.7, `gpt-6-luna` from the live catalog, all 7 checks pass incl. failing-unittest fix, commit and process-group cancel; the review role is not yet exercised. Recertified 2026-09-25 (expires 2026-10-02) with the event triggered cancel check (`inventories/runner-certification-2026-09-25.json`).
-- [!] **AUTO** Certify Gemini API worker; decide whether CLI auth adds value.
-  Blocker: `GEMINI_API_KEY` is not in the login shell or launchd environment, so the runner is `not_configured`; Gemini CLI 0.19.4 installed, CLI auth not assessed.
-- [!] **AUTO** Replace retired Groq model with dynamic discovery.
-  Blocker: live catalog selection by pattern (no hard-coded id) is implemented and unit tested, but `GROQ_API_KEY` is not in the environment, so no live selection ran.
-- [!] **AUTO** Certify Groq low-cost task and review roles.
-  Blocker: `GROQ_API_KEY` not in the environment; runner `not_configured`.
-- [!] **AUTO** Certify OpenRouter approved fallback models and data policy.
-  Blocker: `policy_not_approved` (no approved models or data policy; no key in the environment either); public catalog reachable, HTTP 200, 458 models, no key sent.
-- [ ] **MANUAL** Configure Kimi credential.
+  Certified 2026-09-24 (expires 2026-10-01): codex-cli 0.158.0-alpha.7, `gpt-6-luna` from the live catalog, all 7 checks pass incl. failing-unittest fix, commit and process-group cancel; the review role is not yet exercised. Recertified 2026-09-25 (expires 2026-10-02) with the event triggered cancel check (`inventories/runner-certification-2026-09-25.json`). Recertified 2026-10-18 (expires 2026-10-25), `inventories/runner-certification-2026-10-18.json`.
+- [x] **AUTO** Certify Gemini API worker; decide whether CLI auth adds value.
+  Certified 2026-10-18 on `gemini-3.5-flash-lite` (live catalog, 46 models), `inventories/runner-certification-2026-10-18.json`. Needed a log inspection fix: Gemini's opaque `thoughtSignature` no longer counts as a leaked secret. CLI auth not pursued; the API worker is sufficient.
+- [x] **AUTO** Replace retired Groq model with dynamic discovery.
+  2026-10-18: live selection picked `openai/gpt-oss-20b` from 11 listed models by pattern (patterns updated; the old `instant`/8b models are gone). Groq's edge required a named User-Agent (HTTP 403, error 1010, before the fix).
+- [~] **AUTO** Certify Groq low-cost task and review roles.
+  Low-cost task certified 2026-10-18 on `openai/gpt-oss-20b` (free tier; probe budget raised to 512 tokens for this reasoning model), `inventories/runner-certification-2026-10-18.json`. Review role not yet exercised.
+- [x] **AUTO** Certify OpenRouter approved fallback models and data policy.
+  Resolved by operator decision 2026-10-18: OpenRouter is parked, not certified. The adapter stays in the code, gated off by policy (`policy_not_approved`); the key was removed from the Keychain. Reopen by approving pinned models and a data policy.
+- [x] **MANUAL** Configure Kimi credential.
+  Stored in the macOS Keychain 2026-10-18 (account recharged by the operator). Certified on `kimi-k2.7-code`; the probe sends no temperature (`kimi-k3` accepts only 1).
 - [ ] **AUTO** Benchmark Kimi against Gemini on long-context tasks.
 - [ ] **APPROVAL** Retain or retire Kimi based on benchmark.
 - [x] **AUTO** Remove Windsurf and Pi from all active inventories and routes.
@@ -137,8 +140,14 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
   Operator CLI done (`docs/cli.md`). OpenClaw plugin built in
   `openclaw-ecc-orchestrator/integrations/openclaw-plugin/` (plain JS, no
   dependencies): 28 unit tests, a Python contract test, and an isolated
-  gateway end-to-end approval all pass. NOT installed in the production
-  gateway; installation is an APPROVAL step (see the plugin README).
+  gateway end-to-end approval all pass. Installed in the production gateway
+  2026-10-18 after an operator-approved backup
+  (`~/AgentPlatformBackups/openclaw-20261018T194641.749713Z`; the backup tool
+  now records symlinks without following them). `openclaw plugins inspect`
+  shows it loaded with `/ecc`, `/ecc-decide`, both gateway methods, the panel
+  route and the tail service; only warning is the expected unverified origin
+  (`plugins.allow` intentionally unset). Rollback: unset
+  `plugins.entries.ecc-orchestrator`, then `plugins.load.paths`.
   Open: the runtime needs a standing inbox processor so plugin decisions
   apply without running `approvals approve`; `decided_by` records the shared
   owner profile until per-person OpenClaw sign-in exists (Phase 5).

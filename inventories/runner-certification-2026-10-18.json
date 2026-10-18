@@ -1,0 +1,282 @@
+{
+  "schema_version": "1.0",
+  "captured": "2026-10-18",
+  "source": "openclaw_ecc_orchestrator.runners.certify (single run, all five runners)",
+  "launcher": "bin/with-keychain-secrets (keys read from the macOS login Keychain; no values recorded)",
+  "gate": {
+    "coding_runners_certified": true,
+    "economical_workers_certified": [
+      "gemini",
+      "groq",
+      "kimi"
+    ],
+    "gate_met": true
+  },
+  "runners": {
+    "claude": {
+      "status": "certified",
+      "version": "2.1.281 (Claude Code)",
+      "models": [
+        "claude-haiku-4-5-20251001"
+      ],
+      "certified_at": "2026-10-18T19:47:24Z",
+      "expires_at": "2026-10-25T19:47:24Z",
+      "usage": {
+        "model": "claude-haiku-4-5-20251001",
+        "cost_usd": 0.0513863,
+        "input_tokens": 10,
+        "output_tokens": 44
+      },
+      "checks": [
+        {
+          "name": "installed",
+          "status": "pass",
+          "reason": "installed"
+        },
+        {
+          "name": "authentication",
+          "status": "pass",
+          "reason": "authenticated"
+        },
+        {
+          "name": "live_inference",
+          "status": "pass",
+          "reason": "inference ok"
+        },
+        {
+          "name": "repo_exercise",
+          "status": "pass",
+          "reason": "read/edit/test/commit exercise passed"
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "pass",
+          "reason": "cancelled on the first stream event; whole process group gone"
+        },
+        {
+          "name": "log_inspection",
+          "status": "pass",
+          "reason": "no secret-like content in runner output"
+        },
+        {
+          "name": "metadata_capture",
+          "status": "pass",
+          "reason": "model and usage captured"
+        }
+      ]
+    },
+    "codex": {
+      "status": "certified",
+      "version": "codex-cli 0.158.0-alpha.7",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "certified_at": "2026-10-18T19:47:58Z",
+      "expires_at": "2026-10-25T19:47:58Z",
+      "usage": {
+        "model": "gpt-6-luna",
+        "cost_usd": null,
+        "input_tokens": 21636,
+        "output_tokens": 5
+      },
+      "checks": [
+        {
+          "name": "installed",
+          "status": "pass",
+          "reason": "installed"
+        },
+        {
+          "name": "authentication",
+          "status": "pass",
+          "reason": "authenticated"
+        },
+        {
+          "name": "live_inference",
+          "status": "pass",
+          "reason": "inference ok"
+        },
+        {
+          "name": "repo_exercise",
+          "status": "pass",
+          "reason": "read/edit/test/commit exercise passed"
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "pass",
+          "reason": "cancelled on the first stream event; whole process group gone"
+        },
+        {
+          "name": "log_inspection",
+          "status": "pass",
+          "reason": "no secret-like content in runner output"
+        },
+        {
+          "name": "metadata_capture",
+          "status": "pass",
+          "reason": "model and usage captured"
+        }
+      ]
+    },
+    "gemini": {
+      "status": "certified",
+      "version": null,
+      "models": [
+        "gemini-3.5-flash-lite"
+      ],
+      "certified_at": "2026-10-18T19:48:22Z",
+      "expires_at": "2026-10-25T19:48:22Z",
+      "usage": {
+        "model": "gemini-3.5-flash-lite",
+        "cost_usd": null,
+        "input_tokens": 10,
+        "output_tokens": 1
+      },
+      "checks": [
+        {
+          "name": "installed",
+          "status": "skip",
+          "reason": "api runner: no local installation"
+        },
+        {
+          "name": "authentication",
+          "status": "pass",
+          "reason": "authenticated"
+        },
+        {
+          "name": "live_inference",
+          "status": "pass",
+          "reason": "inference ok"
+        },
+        {
+          "name": "repo_exercise",
+          "status": "skip",
+          "reason": "not a coding runner"
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "skip",
+          "reason": "api runner: per request timeout enforced by the harness"
+        },
+        {
+          "name": "log_inspection",
+          "status": "pass",
+          "reason": "no secret-like content in runner output"
+        },
+        {
+          "name": "metadata_capture",
+          "status": "pass",
+          "reason": "model and usage captured"
+        }
+      ]
+    },
+    "groq": {
+      "status": "certified",
+      "version": null,
+      "models": [
+        "openai/gpt-oss-20b"
+      ],
+      "certified_at": "2026-10-18T19:48:23Z",
+      "expires_at": "2026-10-25T19:48:23Z",
+      "usage": {
+        "model": "openai/gpt-oss-20b",
+        "cost_usd": null,
+        "input_tokens": 81,
+        "output_tokens": 32
+      },
+      "checks": [
+        {
+          "name": "installed",
+          "status": "skip",
+          "reason": "api runner: no local installation"
+        },
+        {
+          "name": "authentication",
+          "status": "pass",
+          "reason": "authenticated"
+        },
+        {
+          "name": "live_inference",
+          "status": "pass",
+          "reason": "inference ok"
+        },
+        {
+          "name": "repo_exercise",
+          "status": "skip",
+          "reason": "not a coding runner"
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "skip",
+          "reason": "api runner: per request timeout enforced by the harness"
+        },
+        {
+          "name": "log_inspection",
+          "status": "pass",
+          "reason": "no secret-like content in runner output"
+        },
+        {
+          "name": "metadata_capture",
+          "status": "pass",
+          "reason": "model and usage captured"
+        }
+      ]
+    },
+    "kimi": {
+      "status": "certified",
+      "version": null,
+      "models": [
+        "kimi-k2.7-code"
+      ],
+      "certified_at": "2026-10-18T19:48:24Z",
+      "expires_at": "2026-10-25T19:48:24Z",
+      "usage": {
+        "model": "kimi-k2.7-code",
+        "cost_usd": null,
+        "input_tokens": 17,
+        "output_tokens": 19
+      },
+      "checks": [
+        {
+          "name": "installed",
+          "status": "skip",
+          "reason": "api runner: no local installation"
+        },
+        {
+          "name": "authentication",
+          "status": "pass",
+          "reason": "authenticated"
+        },
+        {
+          "name": "live_inference",
+          "status": "pass",
+          "reason": "inference ok"
+        },
+        {
+          "name": "repo_exercise",
+          "status": "skip",
+          "reason": "not a coding runner"
+        },
+        {
+          "name": "cancellation_timeout",
+          "status": "skip",
+          "reason": "api runner: per request timeout enforced by the harness"
+        },
+        {
+          "name": "log_inspection",
+          "status": "pass",
+          "reason": "no secret-like content in runner output"
+        },
+        {
+          "name": "metadata_capture",
+          "status": "pass",
+          "reason": "model and usage captured"
+        }
+      ]
+    }
+  },
+  "notes": [
+    "openrouter: parked by operator decision 2026-10-18; key removed from Keychain",
+    "claude: three installs found; ~/.local/bin/claude 2.1.112 shadows the certified nvm 2.1.281 unless PATH puts nvm first",
+    "fixes needed live: Groq User-Agent (403 error 1010), Groq gpt-oss-20b pattern and 512 token probe budget, Gemini thoughtSignature false positive, Kimi temperature and k2 model preference"
+  ]
+}

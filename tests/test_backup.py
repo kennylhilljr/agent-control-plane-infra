@@ -48,6 +48,43 @@ class BackupTests(unittest.TestCase):
                 names = archive.getnames()
             self.assertNotIn("openclaw/logs/gateway.log", names)
 
+    def test_symlinks_are_recorded_not_followed(self) -> None:
+        """OpenClaw 2026.9 keeps symlinks such as plugin-skills/canvas. The
+        backup records each link and its target in the manifest, never follows
+        it, and never copies what it points to."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outside = root / "outside"
+            outside.mkdir()
+            (outside / "elsewhere.txt").write_text("OUTSIDE-CONTENT")
+            source = root / ".openclaw"
+            (source / "plugin-skills").mkdir(parents=True)
+            (source / "openclaw.json").write_text("{}")
+            (source / "plugin-skills" / "canvas").symlink_to(outside)
+            (source / "link-file").symlink_to(outside / "elsewhere.txt")
+            destination = root / "backups"
+
+            dry = BackupManager(source, destination).create(dry_run=True)
+            self.assertEqual((dry.file_count, dry.link_count), (1, 2))
+            self.assertFalse(destination.exists())
+
+            result = BackupManager(source, destination).create()
+            self.assertTrue(result.verified)
+            self.assertEqual((result.file_count, result.link_count), (1, 2))
+            manifest = json.loads(result.manifest.read_text())
+            self.assertEqual(manifest["symlinks"], {
+                "link-file": str(outside / "elsewhere.txt"),
+                "plugin-skills/canvas": str(outside),
+            })
+            self.assertEqual(sorted(manifest["files"]), ["openclaw.json"])
+            with tarfile.open(result.archive, "r:gz") as archive:
+                members = archive.getmembers()
+                self.assertFalse(any(m.issym() or m.islnk() for m in members))
+                for member in members:
+                    if member.isfile():
+                        data = archive.extractfile(member).read()
+                        self.assertNotIn(b"OUTSIDE-CONTENT", data)
+
     def test_verify_rejects_archive_path_traversal(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
