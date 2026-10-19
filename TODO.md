@@ -246,6 +246,11 @@ Recorded 2026-10-18. Each item has value but none blocks the pilot;
 - [ ] **AUTO** API worker so Gemini, Groq and Kimi can author units: turn the
   model's output into a scoped commit in the unit worktree (today dispatch
   launches only the Claude and Codex coding CLIs).
+- [ ] **APPROVAL** Agent team delivery loop: specified in
+  `docs/specs/TEAM-DELIVERY-v1.md` (draft, 2026-10-19), which covers the next
+  two items plus repair loops, agent merge approval, QA verification,
+  security, architect, designer, delivery-lead and product personas, and a
+  preflight round trip. Build after owner approval.
 - [ ] **AUTO** Automated cross-family review: launch the reviewer runner
   instead of recording a verdict by hand.
 - [ ] **AUTO** Plan driver: dispatch ready units, run gates and request
