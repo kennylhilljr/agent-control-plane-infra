@@ -183,7 +183,13 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
 
 ## Phase 6 — Pilot
 
-- [ ] **AUTO** Import the research MCP Phase 1 plan.
+- [x] **AUTO** Import the pilot plan.
+  2026-10-18: pilot changed by the operator from `my-research-mcp-server` to
+  HomeSentinel v2 milestone M0 (17 units). Plan, policy and operator config
+  in `~/Documents/GitHub/homesentinel-v2/.orchestration/` (commit `c4776e1`),
+  validated with the orchestrator's schemas and a `create-run` dry run;
+  runbook `.orchestration/PILOT-M0.md`. Authors: Claude and Codex (API
+  runners cannot author yet; see Backlog).
 - [ ] **APPROVAL** Dispatch three independent pilot work units.
 - [ ] **AUTO** Verify isolated worktrees and non-overlapping scope.
 - [ ] **AUTO** Run required tests and independent reviews.
@@ -238,6 +244,3 @@ Recorded 2026-10-18. Each item has value but none blocks the pilot;
   instead of recording a verdict by hand.
 - [ ] **AUTO** Plan driver: dispatch ready units, run gates and request
   approvals without a CLI command per unit.
-- [ ] **APPROVAL** Pilot choice: HomeSentinel v2 (plan in
-  `~/Documents/GitHub/homesentinel-v2`) proposed instead of
-  `my-research-mcp-server`; M0 with Claude and Codex first.
