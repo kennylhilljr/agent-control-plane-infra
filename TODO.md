@@ -246,13 +246,18 @@ Recorded 2026-10-18. Each item has value but none blocks the pilot;
 - [ ] **AUTO** API worker so Gemini, Groq and Kimi can author units: turn the
   model's output into a scoped commit in the unit worktree (today dispatch
   launches only the Claude and Codex coding CLIs).
-- [ ] **AUTO** Agent team delivery loop: specified in
+- [x] **AUTO** Agent team delivery loop, built 2026-10-19 in openclaw-ecc-orchestrator
+  (`2f41d67` repair loop and preflight, `21499c0` team review and agent
+  merges, `6a65f4e` author_providers, `61377f4` catalog-refresh, `f5bc55b`
+  `ecc drive`). Specified in
   `docs/specs/TEAM-DELIVERY-v2.md` (approved 2026-10-19; v2 rotates roles across all five providers), which covers the next
   two items plus repair loops, agent merge approval, QA verification,
   security, architect, designer, delivery-lead and product personas, and a
   preflight round trip. Build after owner approval.
-- [ ] **AUTO** Automated cross-family review: launch the reviewer runner
-  instead of recording a verdict by hand.
+- [ ] **AUTO** Team delivery v3 (spec revision first): delivery lead may
+  re-queue a unit once past its budget; product report merged as a reviewed
+  branch instead of the state dir; parallel dispatch of non-overlapping
+  units; designer screenshots from a headless browser.
 - [ ] **AUTO** Plan driver: dispatch ready units, run gates and request
   approvals without a CLI command per unit.
 - [ ] **AUTO** OpenClaw cost routing: the five scoped agents (Sun_Bot router on
