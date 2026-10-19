@@ -192,7 +192,7 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
   runners cannot author yet; see Backlog).
   2026-10-19: pilot changed back by the operator to the research MCP
   rebuild: Research MCP v2 milestone M0 (16 units), in
-  `~/Documents/GitHub/my-research-mcp-v2/.orchestration/` (plan validated
+  `~/Documents/GitHub/my-research-mcp/.orchestration/` (plan validated
   with the orchestrator's schemas and classifier; runbook
   `.orchestration/PILOT-M0.md`). HomeSentinel v2 M0 stays ready to run next.
   Not yet committed in the new repository.
