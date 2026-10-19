@@ -157,6 +157,18 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
 - [x] **AUTO** Test restart/resume and conductor handoff.
   `tests/test_resume_integration.py` covers success, failure, cancellation,
   reassignment, conflict, budget exhaustion, restart, and conductor change.
+- [x] **AUTO** Verify the OpenClaw round trip end to end.
+  2026-10-18 (orchestrator `6d1ecde`): `tests/test_roundtrip_openclaw.py`
+  runs the CLI, the plugin engine and the standing inbox processor as
+  separate processes (approve to merge, reject, queued decision, refusals,
+  forged decision, plugin restart, secret hygiene). Live on the Mac,
+  `bin/roundtrip-smoke` passed: run in the live event log, pending in the ECC
+  tab, approved through `ecc-orchestrator.decide` (`decided_by`
+  `gateway-owner`), applied by the launchd processor, merged into a throwaway
+  repository. `/ecc-decide` in the Control UI chat is refused (no sender
+  identity in OpenClaw 2026.9.6); `bin/ecc-decide` is the operator path.
+  The live run found and fixed a redaction false positive on time-stamped
+  branch names.
 
 ## Phase 5 — OpenClaw agents and multiplayer
 
@@ -205,3 +217,27 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
 - [ ] **APPROVAL** Enable remote/cloud workers after security review.
 - [ ] **APPROVAL** Enable experimental Swarm only after DAG reliability target is met.
 - [ ] **AUTO** Verify all definition-of-done conditions.
+
+## Backlog (useful, not blocking)
+
+Recorded 2026-10-18. Each item has value but none blocks the pilot;
+`bin/ecc-decide` covers approvals until the first two land.
+
+- [ ] **AUTO** ECC tab: Approve and Reject buttons that call
+  `ecc-orchestrator.decide` from the logged-in Control UI (no copying ids or
+  plan prefixes). Value grows with the number of approvals a pilot produces.
+- [ ] **AUTO** Plugin option `uiOperatorIdentity` (opt in) so `/ecc-decide`
+  typed in an authorized Control UI session records that handle instead of
+  failing closed; update the isolated gateway test, which expects the refusal.
+- [ ] **AUTO** ECC tab: a Runners section showing certification status,
+  expiry and model per runner from the latest recertification summary.
+- [ ] **AUTO** API worker so Gemini, Groq and Kimi can author units: turn the
+  model's output into a scoped commit in the unit worktree (today dispatch
+  launches only the Claude and Codex coding CLIs).
+- [ ] **AUTO** Automated cross-family review: launch the reviewer runner
+  instead of recording a verdict by hand.
+- [ ] **AUTO** Plan driver: dispatch ready units, run gates and request
+  approvals without a CLI command per unit.
+- [ ] **APPROVAL** Pilot choice: HomeSentinel v2 (plan in
+  `~/Documents/GitHub/homesentinel-v2`) proposed instead of
+  `my-research-mcp-server`; M0 with Claude and Codex first.
