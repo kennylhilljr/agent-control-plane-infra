@@ -190,6 +190,12 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
   validated with the orchestrator's schemas and a `create-run` dry run;
   runbook `.orchestration/PILOT-M0.md`. Authors: Claude and Codex (API
   runners cannot author yet; see Backlog).
+  2026-10-19: pilot changed back by the operator to the research MCP
+  rebuild: Research MCP v2 milestone M0 (16 units), in
+  `~/Documents/GitHub/my-research-mcp-v2/.orchestration/` (plan validated
+  with the orchestrator's schemas and classifier; runbook
+  `.orchestration/PILOT-M0.md`). HomeSentinel v2 M0 stays ready to run next.
+  Not yet committed in the new repository.
 - [ ] **APPROVAL** Dispatch three independent pilot work units.
 - [ ] **AUTO** Verify isolated worktrees and non-overlapping scope.
 - [ ] **AUTO** Run required tests and independent reviews.
@@ -244,3 +250,10 @@ Recorded 2026-10-18. Each item has value but none blocks the pilot;
   instead of recording a verdict by hand.
 - [ ] **AUTO** Plan driver: dispatch ready units, run gates and request
   approvals without a CLI command per unit.
+- [ ] **AUTO** OpenClaw cost routing: the five scoped agents (Sun_Bot router on
+  API Haiku; coder on Codex; researcher and ops on Gemini Flash-Lite;
+  architect on Opus) are live as of 2026-10-19. Groq is out of the agent set
+  until a paid tier (free tier allows 8K tokens per minute; one call is 10.8K).
+- [ ] **AUTO** Local runner for the ECC router once the Mac Studio arrives:
+  an Ollama-backed runner with cost 0 for tier 0 and 1 units, still reviewed
+  by a cloud family; also a candidate for OpenClaw heartbeats and the ops agent.
