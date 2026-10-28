@@ -1,7 +1,7 @@
 ![Agent Control Plane Infrastructure](docs/assets/readme-header.webp)
 
 <p align="center">
-  <a href="pyproject.toml"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white"></a>
+  <a href="pyproject.toml"><img alt="Python 3.11.4+" src="https://img.shields.io/badge/Python-3.11.4%2B-3776AB?style=flat-square&logo=python&logoColor=white"></a>
   <img alt="Runtime dependencies: Python standard library" src="https://img.shields.io/badge/runtime%20dependencies-standard%20library-0F172A?style=flat-square">
   <img alt="Tests: unittest" src="https://img.shields.io/badge/tests-unittest-22C55E?style=flat-square">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/kennylhilljr/agent-control-plane-infra?style=flat-square"></a>
@@ -48,7 +48,7 @@ The CLI is repository-local. `bin/agent-platform` adds `src/` to `PYTHONPATH` an
 
 | Dependency | Required | Purpose |
 | --- | --- | --- |
-| Python 3.11 or newer | Yes | Runs the CLI, backup code, and tests. The `backup` restore check passes `filter="data"` to `tarfile`, which needs Python 3.11.4 or newer. |
+| Python 3.11.4 or newer | Yes | Runs the CLI, backup code, and tests. The `backup` restore check passes `filter="data"` to `tarfile`, which Python added in 3.11.4. |
 | POSIX-compatible shell | For `bin/agent-platform` | Resolves the repository and starts the Python module. |
 | Git | Optional | Adds branch, commit, and working-tree metadata to inventory reports. |
 | OpenClaw CLI | No | Adds sanitized OpenClaw metadata when installed. The backup command operates on the state directory and defaults to `~/.openclaw`. |
@@ -67,14 +67,11 @@ python3 --version
 ./bin/agent-platform --help
 ```
 
-Python must report version 3.11 or newer. Run the test suite before using the backup command against live state:
+Python must report version 3.11.4 or newer. Run the test suite before using the backup command against live state:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 \
-  PYTHONPATH=src python3 -m unittest discover -s tests -v
+PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
-
-Setting `PYTHONDONTWRITEBYTECODE=1` prevents the test run from updating the repository's tracked Python bytecode files.
 
 ### Collect a sanitized inventory
 
@@ -194,7 +191,7 @@ Without `--repository`, the command checks the default paths declared in `src/ag
 ├── MIGRATION_SPEC.md               # Target system and safety invariants
 ├── TODO.md                         # Migration phase ledger
 ├── USER_ACTIONS.md                 # Decisions and credential-dependent work
-└── pyproject.toml                  # Python version and pytest discovery settings
+└── pyproject.toml                  # Python version, optional test extra, pytest settings
 ```
 
 ## Security boundaries
@@ -232,8 +229,7 @@ The inventory collector calls each discovered executable with `--version` and a 
 Run tests from the repository root with `src` on `PYTHONPATH`:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 \
-  PYTHONPATH=src python3 -m unittest discover -s tests -v
+PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
 ## Contributing
