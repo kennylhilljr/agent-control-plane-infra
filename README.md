@@ -48,7 +48,7 @@ The CLI is repository-local. `bin/agent-platform` adds `src/` to `PYTHONPATH` an
 
 | Dependency | Required | Purpose |
 | --- | --- | --- |
-| Python 3.11 or newer | Yes | Runs the CLI, backup code, and tests. |
+| Python 3.11 or newer | Yes | Runs the CLI, backup code, and tests. The `backup` restore check passes `filter="data"` to `tarfile`, which needs Python 3.11.4 or newer. |
 | POSIX-compatible shell | For `bin/agent-platform` | Resolves the repository and starts the Python module. |
 | Git | Optional | Adds branch, commit, and working-tree metadata to inventory reports. |
 | OpenClaw CLI | No | Adds sanitized OpenClaw metadata when installed. The backup command operates on the state directory and defaults to `~/.openclaw`. |
@@ -158,7 +158,7 @@ Do not add these values to `.env` files in this repository. Supply them to the c
 | Option | Behavior |
 | --- | --- |
 | `--json` | Prints a stable operation envelope instead of the raw inventory. |
-| `--output PATH` | Writes the inventory to `PATH`; defaults to `inventories/latest.json`. |
+| `--output PATH` | Writes the inventory to `PATH`; defaults to `inventories/latest.json`, resolved against the current working directory. Run from the repository root, the default overwrites the tracked `inventories/latest.json`. |
 | `--repository PATH` | Adds a repository to inspect. Repeat as needed. Any supplied value replaces the built-in defaults. |
 
 Without `--repository`, the command checks the default paths declared in `src/agent_platform/cli.py`. Missing tools and non-repository paths are reported as status values rather than treated as fatal errors.
@@ -187,6 +187,10 @@ Without `--repository`, the command checks the default paths declared in `src/ag
 │   └── inventory.py                # Sanitized host and tool discovery
 ├── tests/                          # Dependency-free unit tests
 ├── inventories/                    # Sanitized migration evidence
+├── docs/assets/                    # README images
+├── AGENTS.md                       # Guidance for coding agents
+├── CLAUDE.md                       # Imports AGENTS.md for Claude Code
+├── HANDOFF_TO_CLAUDE.md            # Migration handoff notes for the next agent
 ├── MIGRATION_SPEC.md               # Target system and safety invariants
 ├── TODO.md                         # Migration phase ledger
 ├── USER_ACTIONS.md                 # Decisions and credential-dependent work
@@ -234,7 +238,7 @@ PYTHONDONTWRITEBYTECODE=1 \
 
 ## Contributing
 
-Keep changes within the migration safety rules in [`MIGRATION_SPEC.md`](MIGRATION_SPEC.md). Add regression tests for new inventory fields, redaction cases, archive validation, and filesystem behavior. Do not commit generated backups or unsanitized machine state.
+Keep changes within the migration safety rules in [`MIGRATION_SPEC.md`](MIGRATION_SPEC.md). Add regression tests for new inventory fields, redaction cases, archive validation, and filesystem behavior. Do not commit generated backups or unsanitized machine state. Coding agents should also read [`AGENTS.md`](AGENTS.md).
 
 ## License
 
