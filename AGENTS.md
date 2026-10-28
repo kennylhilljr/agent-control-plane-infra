@@ -15,7 +15,7 @@ Before changing anything, read `MIGRATION_SPEC.md` (target design and section 6 
 
 ## Setup
 
-Nothing to install. Python 3.11 or newer is required by `pyproject.toml`; the backup restore check calls `tarfile` with `filter="data"`, which needs 3.11.4 or newer. There are no third-party runtime dependencies.
+Nothing to install. `pyproject.toml` requires Python 3.11.4 or newer, because the backup restore check calls `tarfile` with `filter="data"`. There are no third-party runtime dependencies.
 
 ```bash
 python3 --version
@@ -27,10 +27,10 @@ python3 --version
 Run from the repository root:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python3 -m unittest discover -s tests -v
+PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
-`PYTHONDONTWRITEBYTECODE=1` matters here because `__pycache__` files are tracked in Git. `pyproject.toml` also configures pytest, but pytest is not a declared dependency.
+The tests are standard library `unittest` cases, so the command above needs no packages. pytest also runs them, using the settings in `pyproject.toml`, once the optional `test` extra is installed (`python3 -m pip install -e ".[test]"`). `__pycache__/` and `*.pyc` are ignored by Git.
 
 No formatter, linter or type checker is configured in `pyproject.toml`. The handoff notes ask for a secret scan before reporting progress:
 
