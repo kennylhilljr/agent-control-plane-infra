@@ -70,8 +70,11 @@ python3 --version
 Python must report version 3.11 or newer. Run the test suite before using the backup command against live state:
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
+PYTHONDONTWRITEBYTECODE=1 \
+  PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
+
+Setting `PYTHONDONTWRITEBYTECODE=1` prevents the test run from updating the repository's tracked Python bytecode files.
 
 ### Collect a sanitized inventory
 
@@ -225,7 +228,8 @@ The inventory collector calls each discovered executable with `--version` and a 
 Run tests from the repository root with `src` on `PYTHONPATH`:
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
+PYTHONDONTWRITEBYTECODE=1 \
+  PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
 ## Contributing
