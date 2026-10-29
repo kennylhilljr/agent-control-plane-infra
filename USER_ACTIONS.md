@@ -109,6 +109,13 @@ Required decisions/actions:
    (2026-09-24, reset within minutes). Decide whether the plan's limits suit
    routine coding volume before Phase 6.
 
+## TEAM-DELIVERY v8
+
+1. Review `docs/TEAM-DELIVERY-v8.md` and its run-guide template.
+2. If the workflow is acceptable, record approval against the exact document
+   revision. Until then, TEAM-DELIVERY v8 remains a draft and cannot satisfy an
+   owner-approval gate for `create-run`.
+
 ## Pilot and retirement
 
 1. Approve the initial three-unit research MCP pilot.
