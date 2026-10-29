@@ -156,7 +156,7 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
 - [x] **AUTO** Add a reusable run-guide template.
   `docs/templates/TEAM-DELIVERY-v8-run-guide.md` separates automated evidence,
   delivery-lead duties, architect review, and operator-only checks and approval.
-- [ ] **MANUAL** Review and approve TEAM-DELIVERY v8 as owner.
+- [x] **MANUAL** Review and approve TEAM-DELIVERY v8 as owner (approved 2026-10-29).
   The repository contains a draft only. Its presence does not authorize
   `create-run` or satisfy an owner-approval gate. See `USER_ACTIONS.md`.
 - [~] **AUTO** Track cross-repository adoption under issue #6.
