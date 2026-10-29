@@ -1,4 +1,4 @@
-![Agent Control Plane Infrastructure](docs/assets/readme-header.webp)
+![Agent Control Plane Infrastructure](docs/assets/readme-header-bots.webp)
 
 <p align="center">
   <a href="pyproject.toml"><img alt="Python 3.11.4+" src="https://img.shields.io/badge/Python-3.11.4%2B-3776AB?style=flat-square&logo=python&logoColor=white"></a>
