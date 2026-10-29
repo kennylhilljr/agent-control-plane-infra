@@ -20,7 +20,7 @@ This repository is an active migration workspace, not a finished control-plane p
 - `inventory`: records host, runner, provider-presence, OpenClaw, ECC, and Git metadata without reading credential values, prompts, messages, or file contents.
 - `backup`: creates an owner-only OpenClaw checkpoint, excludes live logs, writes SHA-256 checksums, and verifies a disposable restore before reporting success.
 
-[`MIGRATION_SPEC.md`](MIGRATION_SPEC.md) describes the target architecture and acceptance gates. [`TODO.md`](TODO.md) is the durable status ledger, and [`USER_ACTIONS.md`](USER_ACTIONS.md) tracks decisions that need an operator.
+[`MIGRATION_SPEC.md`](MIGRATION_SPEC.md) describes the target architecture and acceptance gates. The draft [`TEAM-DELIVERY v8`](docs/TEAM-DELIVERY-v8.md) guide defines plan readiness, cross-unit contracts, run hygiene, and milestone close; use its [`run-guide template`](docs/templates/TEAM-DELIVERY-v8-run-guide.md) for individual runs. [`TODO.md`](TODO.md) is the durable status ledger, and [`USER_ACTIONS.md`](USER_ACTIONS.md) tracks decisions that need an operator. TEAM-DELIVERY v8 remains pending owner approval.
 
 ## Architecture
 
@@ -184,7 +184,10 @@ Without `--repository`, the command checks the default paths declared in `src/ag
 │   └── inventory.py                # Sanitized host and tool discovery
 ├── tests/                          # Dependency-free unit tests
 ├── inventories/                    # Sanitized migration evidence
-├── docs/assets/                    # README images
+├── docs/
+│   ├── TEAM-DELIVERY-v8.md         # Draft delivery policy and ordered gates
+│   ├── templates/                  # Reusable run-guide template
+│   └── assets/                     # README images
 ├── AGENTS.md                       # Guidance for coding agents
 ├── CLAUDE.md                       # Imports AGENTS.md for Claude Code
 ├── HANDOFF_TO_CLAUDE.md            # Migration handoff notes for the next agent
@@ -234,7 +237,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 
 ## Contributing
 
-Keep changes within the migration safety rules in [`MIGRATION_SPEC.md`](MIGRATION_SPEC.md). Add regression tests for new inventory fields, redaction cases, archive validation, and filesystem behavior. Do not commit generated backups or unsanitized machine state. Coding agents should also read [`AGENTS.md`](AGENTS.md).
+Keep changes within the migration safety rules in [`MIGRATION_SPEC.md`](MIGRATION_SPEC.md). For milestone delivery, follow the draft [`TEAM-DELIVERY v8`](docs/TEAM-DELIVERY-v8.md) guide and record any required owner approval before creating a run. Add regression tests for new inventory fields, redaction cases, archive validation, and filesystem behavior. Do not commit generated backups or unsanitized machine state. Coding agents should also read [`AGENTS.md`](AGENTS.md).
 
 ## License
 

@@ -146,6 +146,24 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
   `tests/test_resume_integration.py` covers success, failure, cancellation,
   reassignment, conflict, budget exhaustion, restart, and conductor change.
 
+### TEAM-DELIVERY v8 documentation (issues #4, #5, and #6)
+
+- [x] **AUTO** Draft the authoritative TEAM-DELIVERY v8 guide.
+  `docs/TEAM-DELIVERY-v8.md` defines the post-LLD plan readiness gate,
+  deterministic lint, standalone architect check, owner approval boundary,
+  Provides/Requires declarations, contract-first milestone units, composition
+  ownership, active-run hygiene, milestone close, and evidence requirements.
+- [x] **AUTO** Add a reusable run-guide template.
+  `docs/templates/TEAM-DELIVERY-v8-run-guide.md` separates automated evidence,
+  delivery-lead duties, architect review, and operator-only checks and approval.
+- [ ] **MANUAL** Review and approve TEAM-DELIVERY v8 as owner.
+  The repository contains a draft only. Its presence does not authorize
+  `create-run` or satisfy an owner-approval gate. See `USER_ACTIONS.md`.
+- [~] **AUTO** Track cross-repository adoption under issue #6.
+  Issue #6 is a tracking issue. Linked runtime and application issues keep
+  their own implementation, test, review, and acceptance status; none is
+  marked complete by these documentation changes.
+
 ## Phase 5 — OpenClaw agents and multiplayer
 
 - [ ] **APPROVAL** Create conductor and specialist agent roster.
