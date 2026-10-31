@@ -1,6 +1,6 @@
 # TEAM-DELIVERY v8
 
-- **Status:** Draft; owner approval pending
+- **Status:** Approved by the owner on 2026-10-29 (revision: blob `f25f665b1e4d` at `a09a637`)
 - **Applies to:** Milestone-based delivery coordinated by `openclaw-ecc-orchestrator`
 - **Authority:** This document specializes `MIGRATION_SPEC.md`. The migration specification and repository `AGENTS.md` files take precedence if their rules conflict with this draft.
 

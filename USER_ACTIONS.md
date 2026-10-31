@@ -112,9 +112,9 @@ Required decisions/actions:
 ## TEAM-DELIVERY v8
 
 1. Review `docs/TEAM-DELIVERY-v8.md` and its run-guide template.
-2. If the workflow is acceptable, record approval against the exact document
-   revision. Until then, TEAM-DELIVERY v8 remains a draft and cannot satisfy an
-   owner-approval gate for `create-run`.
+2. Done: the owner approved TEAM-DELIVERY v8 on 2026-10-29, against
+   `docs/TEAM-DELIVERY-v8.md` blob `f25f665b1e4d` and the run-guide template blob
+   `d41f4c443065` at commit `a09a637`.
 
 ## Pilot and retirement
 
