@@ -2,7 +2,7 @@
 
 This repository holds the migration plan and a small standard-library Python CLI for an ECC + OpenClaw agent platform. The CLI has two subcommands: `inventory` writes a sanitized report of local tools, providers and repositories, and `backup` creates and verifies an OpenClaw state checkpoint. Runtime orchestration lives in a separate repository, `openclaw-ecc-orchestrator`.
 
-Before changing anything, read `MIGRATION_SPEC.md` (target design and section 6 safety invariants), `TODO.md` (the status ledger) and `USER_ACTIONS.md` (decisions reserved for the operator). `HANDOFF_TO_CLAUDE.md` has the latest handoff notes; its absolute paths refer to the operator's machine.
+Before changing code, the CLI, `MIGRATION_SPEC.md` or the safety rules below, read `MIGRATION_SPEC.md` (target design and section 6 safety invariants), `TODO.md` (the status ledger) and `USER_ACTIONS.md` (decisions reserved for the operator). Documentation-only changes (README text and diagrams, typo fixes, `docs/` prose, this file) need no such review: make the change, check it renders, and open the PR. `HANDOFF_TO_CLAUDE.md` has the latest handoff notes; its absolute paths refer to the operator's machine.
 
 ## Layout
 
@@ -56,5 +56,5 @@ gitleaks dir . --no-banner --redact --exit-code 1
 - Use `backup --dry-run` before any real backup. Do not add restores, upgrades or cleanup that delete data; every mutation needs a dry run or preflight and a rollback path.
 - Treat the legacy Agent-Engineers repository as read-only.
 - Do not guess Kimi credentials, operator identities, approval roles, OpenRouter source-code policy or remote-access topology.
-- Do not commit, push or merge unless the operator asks.
+- Commit and push on a branch and open a PR as your bot. Merge it yourself when it is documentation-only or a low-risk change covered by passing tests; changes to `MIGRATION_SPEC.md`, the safety invariants or anything in `USER_ACTIONS.md` wait for the operator. Never push to `main` directly.
 - Keep `TODO.md` current when work changes migration status.
