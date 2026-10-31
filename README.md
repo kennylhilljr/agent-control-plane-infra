@@ -30,14 +30,14 @@ flowchart LR
     CLI --> INV[InventoryCollector]
     CLI --> BAK[BackupManager]
 
-    INV --> HOST[Host and executable metadata]
-    INV --> ENV[Provider credential presence]
-    INV --> OC[OpenClaw JSON commands]
-    INV --> GIT[Selected Git repositories]
+    HOST[Host and executable metadata] --> INV
+    ENV[Provider credential presence] --> INV
+    OC[OpenClaw JSON commands] --> INV
+    GIT[Selected Git repositories] --> INV
     INV --> OUT[inventories/latest.json]
 
-    BAK --> STATE[OpenClaw state directory]
-    STATE --> ARCHIVE[Owner-only tar.gz checkpoint]
+    STATE[OpenClaw state directory] --> BAK
+    BAK --> ARCHIVE[Owner-only tar.gz checkpoint]
     ARCHIVE --> VERIFY[Disposable extraction and checksum verification]
     VERIFY --> MANIFEST[manifest.json]
 ```
