@@ -157,8 +157,10 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
   `docs/templates/TEAM-DELIVERY-v8-run-guide.md` separates automated evidence,
   delivery-lead duties, architect review, and operator-only checks and approval.
 - [x] **MANUAL** Review and approve TEAM-DELIVERY v8 as owner (approved 2026-10-29).
-  The repository contains a draft only. Its presence does not authorize
-  `create-run` or satisfy an owner-approval gate. See `USER_ACTIONS.md`.
+  The owner-approval gate for TEAM-DELIVERY v8 is satisfied for the reviewed
+  revision recorded in `USER_ACTIONS.md` (guide blob `f25f665b1e4d`, run-guide
+  template blob `d41f4c443065`). A later change to either file needs a new
+  approval. Other `create-run` prerequisites still apply.
 - [~] **AUTO** Track cross-repository adoption under issue #6.
   Issue #6 is a tracking issue. Linked runtime and application issues keep
   their own implementation, test, review, and acceptance status; none is
