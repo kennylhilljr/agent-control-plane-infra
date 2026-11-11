@@ -214,7 +214,7 @@ class BackupCliTests(CliTestCase):
                     {"name": "symlinks-recorded-not-followed", "status": "passed", "count": 1},
                     {"name": "disposable-restore", "status": "passed"},
                 ],
-                "warnings": ["Live logs are intentionally excluded from rollback state."],
+                "warnings": ["Live logs and the tmp/ scratch directory are intentionally excluded from rollback state."],
                 "required_user_actions": [],
                 "rollback_checkpoint": str(result.checkpoint_dir),
                 "archive": str(result.archive),

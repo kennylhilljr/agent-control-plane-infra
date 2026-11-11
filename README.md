@@ -18,7 +18,7 @@ The implementation is intentionally small. It does not run the orchestrator, dis
 This repository is an active migration workspace, not a finished control-plane product. The current CLI supports:
 
 - `inventory`: records host, runner, provider-presence, OpenClaw, ECC, and Git metadata without reading credential values, prompts, messages, or file contents.
-- `backup`: creates an owner-only OpenClaw checkpoint, excludes live logs, writes SHA-256 checksums, and verifies a disposable restore before reporting success.
+- `backup`: creates an owner-only OpenClaw checkpoint, excludes live logs and the top-level tmp/ scratch directory, writes SHA-256 checksums, and verifies a disposable restore before reporting success.
 
 [`MIGRATION_SPEC.md`](MIGRATION_SPEC.md) describes the target architecture and acceptance gates. The draft [`TEAM-DELIVERY v8`](docs/TEAM-DELIVERY-v8.md) guide defines plan readiness, cross-unit contracts, run hygiene, and milestone close; use its [`run-guide template`](docs/templates/TEAM-DELIVERY-v8-run-guide.md) for individual runs. [`TODO.md`](TODO.md) is the durable status ledger, and [`USER_ACTIONS.md`](USER_ACTIONS.md) tracks decisions that need an operator. TEAM-DELIVERY v8 remains pending owner approval.
 
@@ -125,7 +125,7 @@ openclaw-<UTC timestamp>/
 └── openclaw-state.tar.gz
 ```
 
-The backup root and checkpoint directory must not grant group or other access. Archives and manifests are written with mode `0600`; checkpoint directories use `0700`. The command rejects symbolic links and unsafe archive members, excludes the top-level `logs/` directory, restores the archive into a temporary directory, and compares every restored file checksum with the source.
+The backup root and checkpoint directory must not grant group or other access. Archives and manifests are written with mode `0600`; checkpoint directories use `0700`. The command rejects symbolic links and unsafe archive members, excludes the top-level `logs/` and `tmp/` directories, restores the archive into a temporary directory, and compares every restored file checksum with the source.
 
 The archive is compressed, not encrypted. OpenClaw state can contain credentials and private session data, so keep checkpoints outside Git on an encrypted, access-controlled volume. Never attach them to issues or pull requests.
 

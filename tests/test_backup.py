@@ -1,15 +1,34 @@
 from __future__ import annotations
 
 import json
+import os
 import tarfile
 import tempfile
 import sys
 import unittest
+import unittest.mock as mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+import agent_platform.backup as backup
 from agent_platform.backup import BackupManager
+
+TARGET = "cron/jobs.json"
+
+
+def _make_source(root: Path) -> Path:
+    source = root / ".openclaw"
+    (source / "cron").mkdir(parents=True)
+    (source / "openclaw.json").write_text('{"mode":"test"}')
+    (source / "cron" / "jobs.json").write_text('{"jobs":[]}')
+    return source
+
+
+def _rewrite(path: Path) -> None:
+    stat = path.stat()
+    path.write_text('{"jobs":["changed during backup"]}')
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
 
 
 class BackupTests(unittest.TestCase):
@@ -99,6 +118,187 @@ class BackupTests(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 BackupManager.verify_archive(archive_path, {})
+
+    def _assert_overlap_refused(self, source: Path, destination: Path) -> None:
+        for dry_run in (False, True):
+            with self.subTest(dry_run=dry_run):
+                with self.assertRaisesRegex(ValueError, "source") as caught:
+                    BackupManager(source, destination).create(dry_run=dry_run)
+                message = str(caught.exception)
+                self.assertIn(str(source.resolve()), message)
+                self.assertIn(str(destination.resolve()), message)
+
+    def test_destination_equal_to_source_is_refused(self) -> None:
+        """test_destination_equal_to_source_is_refused: normal and dry-run
+        backups refuse a destination equal to the source."""
+        with tempfile.TemporaryDirectory() as directory:
+            source = _make_source(Path(directory))
+            self._assert_overlap_refused(source, source)
+
+    def test_destination_inside_source_is_refused(self) -> None:
+        """test_destination_inside_source_is_refused: normal and dry-run
+        backups refuse a destination inside the source."""
+        with tempfile.TemporaryDirectory() as directory:
+            source = _make_source(Path(directory))
+            self._assert_overlap_refused(source, source / "nested-backups")
+            self.assertFalse((source / "nested-backups").exists())
+
+    def test_destination_contains_source_is_refused(self) -> None:
+        """test_destination_contains_source_is_refused: normal and dry-run
+        backups refuse a destination that contains the source."""
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "wrapper"
+            parent.mkdir()
+            source = _make_source(parent)
+            self._assert_overlap_refused(source, parent)
+
+    def test_tmp_excluded_from_manifest(self) -> None:
+        """test_tmp_excluded_from_manifest: the top-level tmp/ directory is
+        left out of the manifest and the archive."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / ".openclaw"
+            (source / "tmp").mkdir(parents=True)
+            (source / "openclaw.json").write_text("{}")
+            (source / "tmp" / "scratch.bin").write_bytes(b"scratch")
+
+            result = BackupManager(source, root / "backups").create()
+
+            manifest = json.loads(result.manifest.read_text())
+            self.assertNotIn("tmp/scratch.bin", manifest["files"])
+            self.assertIn("tmp", manifest["excluded_top_level"])
+            with tarfile.open(result.archive, "r:gz") as archive:
+                self.assertNotIn("openclaw/tmp/scratch.bin", archive.getnames())
+
+    def test_source_changed_exception_is_runtime_error_subclass(self) -> None:
+        """test_source_changed_exception_is_runtime_error_subclass:
+        SourceChangedDuringBackup exists and subclasses RuntimeError."""
+        self.assertTrue(hasattr(backup, "SourceChangedDuringBackup"))
+        self.assertTrue(issubclass(backup.SourceChangedDuringBackup, RuntimeError))
+
+    def _run_race(self, patcher_factory, state: dict[str, bool]) -> None:
+        exc_cls = getattr(backup, "SourceChangedDuringBackup", None)
+        self.assertIsNotNone(exc_cls, "SourceChangedDuringBackup missing")
+        self.assertTrue(issubclass(exc_cls, RuntimeError))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = _make_source(root)
+            target = (source / "cron" / "jobs.json").resolve()
+            with patcher_factory(target):
+                try:
+                    BackupManager(source, root / "backups").create()
+                except Exception as exc:  # the type is asserted below
+                    caught = exc
+                else:
+                    self.fail("create() did not detect the source change")
+        self.assertTrue(state["ran"], "injection did not fire")
+        self.assertIsInstance(caught, exc_cls)
+        self.assertIn(TARGET, str(caught))
+        self.assertIn("Stop the Gateway and retry.", str(caught))
+
+    def _sha256_failing_with(self, error: type[OSError]) -> None:
+        state = {"ran": False}
+        real_sha256 = backup._sha256
+
+        def factory(target: Path):
+            def side_effect(path: Path) -> str:
+                if path == target:
+                    state["ran"] = True
+                    raise error("injected")
+                return real_sha256(path)
+            return mock.patch.object(backup, "_sha256", side_effect=side_effect)
+
+        self._run_race(factory, state)
+
+    def test_sha256_filenotfound_raises_source_changed(self) -> None:
+        """test_sha256_filenotfound_raises_source_changed: a FileNotFoundError
+        while hashing becomes SourceChangedDuringBackup."""
+        self._sha256_failing_with(FileNotFoundError)
+
+    def test_sha256_oserror_raises_source_changed(self) -> None:
+        """test_sha256_oserror_raises_source_changed: an OSError while
+        hashing becomes SourceChangedDuringBackup."""
+        self._sha256_failing_with(OSError)
+
+    def test_file_changed_after_enumeration_before_hashing_raises(self) -> None:
+        """test_file_changed_after_enumeration_before_hashing_raises: a
+        rewrite between enumeration and hashing fails the pre-hash check."""
+        state = {"ran": False}
+
+        def factory(target: Path):
+            def side_effect(manager: BackupManager) -> None:
+                state["ran"] = True
+                _rewrite(target)
+            return mock.patch.object(backup.BackupManager, "_after_enumeration",
+                                     autospec=True, side_effect=side_effect)
+
+        self._run_race(factory, state)
+
+    def _archive_opened_hook(self, action) -> None:
+        state = {"ran": False}
+
+        def factory(target: Path):
+            def side_effect(manager: BackupManager, archive: tarfile.TarFile) -> None:
+                state["ran"] = True
+                action(target)
+            return mock.patch.object(backup.BackupManager, "_after_archive_opened",
+                                     autospec=True, side_effect=side_effect)
+
+        self._run_race(factory, state)
+
+    def test_file_changed_after_archive_opened_before_add_raises(self) -> None:
+        """test_file_changed_after_archive_opened_before_add_raises: a
+        rewrite after hashing and before tarfile.add fails the pre-add
+        check."""
+        self._archive_opened_hook(_rewrite)
+
+    def test_pre_add_lstat_oserror_after_archive_opened_raises(self) -> None:
+        """test_pre_add_lstat_oserror_after_archive_opened_raises: deleting
+        the file before tarfile.add makes the pre-add lstat fail, and the
+        error is translated."""
+        self._archive_opened_hook(lambda target: target.unlink())
+
+    def _tarfile_add_hook(self, action) -> None:
+        state = {"ran": False}
+
+        def factory(target: Path):
+            def side_effect(manager: BackupManager, path: Path, relative) -> None:
+                if str(relative) == TARGET:
+                    state["ran"] = True
+                    action(target)
+            return mock.patch.object(backup.BackupManager, "_after_tarfile_add",
+                                     autospec=True, side_effect=side_effect)
+
+        self._run_race(factory, state)
+
+    def test_file_deleted_after_tarfile_add_raises(self) -> None:
+        """test_file_deleted_after_tarfile_add_raises: deleting the file
+        right after tarfile.add fails the post-add check."""
+        self._tarfile_add_hook(lambda target: target.unlink())
+
+    def test_file_modified_after_tarfile_add_raises(self) -> None:
+        """test_file_modified_after_tarfile_add_raises: rewriting the file
+        right after tarfile.add fails the post-add check."""
+        self._tarfile_add_hook(_rewrite)
+
+    def test_file_mode_changed_after_tarfile_add_raises(self) -> None:
+        """test_file_mode_changed_after_tarfile_add_raises: a mode-only
+        change after tarfile.add fails the four-field post-add check."""
+        def chmod_only(target: Path) -> None:
+            before = target.stat()
+            os.chmod(target, (before.st_mode & 0o777) ^ 0o100)
+            after = target.stat()
+            self.assertEqual((before.st_size, before.st_mtime_ns),
+                             (after.st_size, after.st_mtime_ns))
+            self.assertNotEqual(before.st_mode, after.st_mode)
+
+        self._tarfile_add_hook(chmod_only)
+
+    def test_post_add_lstat_oserror_raises(self) -> None:
+        """test_post_add_lstat_oserror_raises: deleting the file after
+        tarfile.add makes the post-add lstat fail, and the error is
+        translated."""
+        self._tarfile_add_hook(lambda target: target.unlink())
 
 
 if __name__ == "__main__":

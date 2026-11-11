@@ -251,7 +251,7 @@ def _run_backup(args: argparse.Namespace) -> int:
                 "status": "passed" if result.verified else "not-run",
             },
         ],
-        warnings=["Live logs are intentionally excluded from rollback state."],
+        warnings=["Live logs and the tmp/ scratch directory are intentionally excluded from rollback state."],
         rollback_checkpoint=str(result.checkpoint_dir),
         archive=str(result.archive),
         manifest=str(result.manifest),

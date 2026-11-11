@@ -20,6 +20,8 @@ Legend:
 - [x] **AUTO** Back up OpenClaw configuration, state databases, and job definitions.
   Verified checkpoint: `/Users/bkh223/AgentPlatformBackups/openclaw-20260924T052012.596577Z`.
 - [x] **AUTO** Validate backup checksums and disposable restore.
+- [x] **AUTO** Refuse destinations overlapping the source, exclude tmp/, and detect mid-backup source changes.
+  Issue #25: the error tells the operator to stop the Gateway and retry.
 - [x] **AUTO** Check committed inventory evidence for leaks and over-redaction.
   `python3 scripts/check_inventories.py` (run by `scripts/check.sh`) passes on
   every committed `inventories/**/*.json`; `redact` now covers private keys,
