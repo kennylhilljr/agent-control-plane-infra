@@ -1,6 +1,6 @@
 # CI
 
-`scripts/check.sh` is the single check command for this repository. It runs the unit tests, a shell syntax check and shellcheck on the shell scripts, JSON validation of `inventories/latest.json` when that file is present, and a gitleaks secret scan. Local runs and CI call the same script, so a green local check should mean a green CI run.
+`scripts/check.sh` is the single check command for this repository. It runs the unit tests, then a `sh -n` syntax check on the shell scripts. ShellCheck also runs when `shellcheck` is installed; without it the script prints "shellcheck not installed; skipping" and continues, so install ShellCheck to get that check locally. Next it runs the inventory validator `scripts/check_inventories.py` only when that script exists, and skips the step otherwise. Last comes a gitleaks secret scan, which fails when gitleaks is missing unless `ALLOW_NO_GITLEAKS=1` is set. Local runs and CI call the same script, so a green local check should mean a green CI run.
 
 `scripts/check.sh` and `githooks/` come from #23, and the workflow below should only be installed in `.github/workflows/` after #23 has merged.
 

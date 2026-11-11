@@ -123,6 +123,13 @@ class DocsCiTests(unittest.TestCase):
         ):
             self.assertIn(needle, self.text)
 
+    def test_doc_describes_optional_check_steps(self) -> None:
+        """DOCS-CI-10: the doc says ShellCheck and the inventory validator are skipped when absent."""
+        self.assertIn("shellcheck not installed; skipping", self.text)
+        self.assertIn("scripts/check_inventories.py", self.text)
+        self.assertIn("ALLOW_NO_GITLEAKS=1", self.text)
+        self.assertNotIn("inventories/latest.json", self.text)
+
     def test_doc_has_no_en_or_em_dash(self) -> None:
         """DOCS-CI-09: the doc has no en or em dash."""
         self.assertNotIn(chr(0x2013), self.text)
