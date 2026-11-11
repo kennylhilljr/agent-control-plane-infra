@@ -83,10 +83,20 @@ class BackupManager:
                     archive.add(path, arcname=str(PurePosixPath("openclaw", *relative.parts)),
                                 recursive=False)
                 except OSError as error:
-                    raise _source_changed(relative_posix) from error
+                    # The error may come from writing the archive (a full
+                    # disk, say), so only blame the source if it changed.
+                    if _checked_snapshot(path, relative_posix) != pre_add_snap:
+                        raise _source_changed(relative_posix) from error
+                    raise
                 self._after_tarfile_add(path, PurePosixPath(*relative.parts))
                 post_add_snap = _checked_snapshot(path, relative_posix)
                 if post_add_snap != pre_add_snap:
+                    raise _source_changed(relative_posix)
+            # A file that passed its own post-add check can still be rewritten
+            # while later files are archived, so check every file once more.
+            for path in files:
+                relative_posix = str(PurePosixPath(*path.relative_to(self.source).parts))
+                if _checked_snapshot(path, relative_posix) != post_hash_stats[path]:
                     raise _source_changed(relative_posix)
         archive_path.chmod(0o600)
         self.verify_archive(archive_path, expected)

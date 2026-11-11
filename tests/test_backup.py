@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import json
 import os
 import tarfile
@@ -7,7 +8,9 @@ import tempfile
 import sys
 import unittest
 import unittest.mock as mock
-from pathlib import Path
+from collections.abc import Callable
+from contextlib import AbstractContextManager
+from pathlib import Path, PurePosixPath
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -258,12 +261,14 @@ class BackupTests(unittest.TestCase):
         error is translated."""
         self._archive_opened_hook(lambda target: target.unlink())
 
-    def _tarfile_add_hook(self, action) -> None:
+    def _tarfile_add_hook(self, action: Callable[[Path], None],
+                          trigger: str = TARGET) -> None:
         state = {"ran": False}
 
-        def factory(target: Path):
-            def side_effect(manager: BackupManager, path: Path, relative) -> None:
-                if str(relative) == TARGET:
+        def factory(target: Path) -> AbstractContextManager[object]:
+            def side_effect(manager: BackupManager, path: Path,
+                            relative: PurePosixPath) -> None:
+                if str(relative) == trigger:
                     state["ran"] = True
                     action(target)
             return mock.patch.object(backup.BackupManager, "_after_tarfile_add",
@@ -299,6 +304,61 @@ class BackupTests(unittest.TestCase):
         tarfile.add makes the post-add lstat fail, and the error is
         translated."""
         self._tarfile_add_hook(lambda target: target.unlink())
+
+    def test_earlier_file_modified_while_later_file_added_raises(self) -> None:
+        """test_earlier_file_modified_while_later_file_added_raises: rewriting
+        an already archived file while a later file is added fails the final
+        check over every file."""
+        self._tarfile_add_hook(_rewrite, trigger="openclaw.json")
+
+    def test_earlier_file_deleted_while_later_file_added_raises(self) -> None:
+        """test_earlier_file_deleted_while_later_file_added_raises: deleting
+        an already archived file while a later file is added fails the final
+        check, and the lstat error is translated."""
+        self._tarfile_add_hook(lambda target: target.unlink(),
+                               trigger="openclaw.json")
+
+    def test_archive_write_enospc_is_not_reported_as_source_change(self) -> None:
+        """test_archive_write_enospc_is_not_reported_as_source_change: a full
+        destination while tarfile.add writes the archive keeps its ENOSPC
+        error instead of blaming the unchanged source."""
+        state = {"ran": False}
+        real_add = tarfile.TarFile.add
+
+        def add(archive: tarfile.TarFile, name: Path, *args, **kwargs) -> None:
+            if Path(name).name == "jobs.json":
+                state["ran"] = True
+                raise OSError(errno.ENOSPC, "No space left on device")
+            real_add(archive, name, *args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = _make_source(root)
+            with mock.patch.object(tarfile.TarFile, "add", autospec=True, side_effect=add):
+                with self.assertRaises(OSError) as raised:
+                    BackupManager(source, root / "backups").create()
+        self.assertTrue(state["ran"], "injection did not fire")
+        self.assertNotIsInstance(raised.exception, backup.SourceChangedDuringBackup)
+        self.assertEqual(raised.exception.errno, errno.ENOSPC)
+
+    def test_tarfile_add_oserror_after_source_change_raises(self) -> None:
+        """test_tarfile_add_oserror_after_source_change_raises: an OSError
+        from tarfile.add when the source file did change is still reported
+        as a source change."""
+        state = {"ran": False}
+
+        def factory(target: Path) -> AbstractContextManager[object]:
+            real_add = tarfile.TarFile.add
+
+            def add(archive: tarfile.TarFile, name: Path, *args, **kwargs) -> None:
+                if Path(name) == target:
+                    state["ran"] = True
+                    _rewrite(target)
+                    raise OSError("injected read failure")
+                real_add(archive, name, *args, **kwargs)
+            return mock.patch.object(tarfile.TarFile, "add", autospec=True, side_effect=add)
+
+        self._run_race(factory, state)
 
 
 if __name__ == "__main__":
