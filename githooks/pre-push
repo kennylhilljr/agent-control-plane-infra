@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+# Opt-in pre-push hook. Enable with: git config core.hooksPath githooks
+# Runs scripts/check.sh from the repository root and blocks the push if it fails.
+
+REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+if [ ! -f "$REPO_ROOT/scripts/check.sh" ]; then
+    echo 'pre-push: scripts/check.sh not found at '"$REPO_ROOT" >&2
+    exit 1
+fi
+
+cd "$REPO_ROOT"
+exec sh "$REPO_ROOT/scripts/check.sh"
