@@ -129,10 +129,16 @@ def _missing_ancestors(path: Path) -> list[Path]:
 
 
 def _absolute(path: Path) -> Path:
+    """Best-effort absolute path. Never raises, so tracking cannot turn an
+    operational error into a traceback."""
     try:
         return path.expanduser().resolve()
-    except (OSError, RuntimeError):
+    except (OSError, RuntimeError, ValueError):
+        pass
+    try:
         return Path(os.path.abspath(os.path.expanduser(path)))
+    except (OSError, RuntimeError, ValueError):
+        return path
 
 
 @dataclass
@@ -158,7 +164,7 @@ class _Tracker:
             tracker.missing = _missing_ancestors(root)
             if root.is_dir():
                 tracker.children = {entry.name for entry in root.iterdir()}
-        except OSError:
+        except (OSError, ValueError):
             tracker.inspect_failed = True
         return tracker
 
@@ -169,7 +175,7 @@ class _Tracker:
         try:
             tracker.missing = _missing_ancestors(path)
             tracker.output_stat = _stat_key(path)
-        except OSError:
+        except (OSError, ValueError):
             tracker.inspect_failed = True
         return tracker
 
@@ -193,7 +199,7 @@ class _Tracker:
                             f"Unverified checkpoint left at {leftover}; it is not a "
                             "verified rollback checkpoint."
                         )
-        except OSError:
+        except (OSError, ValueError):
             self.inspect_failed = True
         if self.inspect_failed:
             target = self.root or self.output

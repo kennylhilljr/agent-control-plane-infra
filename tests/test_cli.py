@@ -359,6 +359,20 @@ class BackupCliTests(CliTestCase):
             self.assertEqual(len(envelope["warnings"]), 1)
             self.assertIn(f"Could not inspect {destination}", envelope["warnings"][0])
 
+    def test_unresolvable_paths_return_an_envelope(self) -> None:
+        gone = FileNotFoundError(errno.ENOENT, "No such file or directory")
+        for argv in (
+            ["backup", "--backup-dir", "relative-backups", "--source", "missing", "--json"],
+            ["inventory", "--output", "relative/out.json", "--repository", "repo", "--json"],
+        ):
+            collector = mock.Mock()
+            collector.return_value.collect.side_effect = gone
+            with mock.patch.object(Path, "resolve", side_effect=gone), \
+                    mock.patch.object(os.path, "abspath", side_effect=gone), \
+                    mock.patch.object(cli, "InventoryCollector", collector):
+                envelope = self.assert_json_failure(run_cli(argv), argv[0], changed=False)
+            self.assertEqual(envelope["error"], os.strerror(errno.ENOENT))
+
 
 class InventoryCliTests(CliTestCase):
     def setUp(self) -> None:
