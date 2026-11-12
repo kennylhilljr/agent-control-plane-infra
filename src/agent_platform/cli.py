@@ -29,6 +29,11 @@ KNOWN_VALUE_ERROR_PREFIXES = (
     "Unsafe archive path: ",
     "Unsafe archive member: ",
 )
+# OSError messages raised by this package with a path and fixed text.
+KNOWN_OS_ERROR_PREFIXES = (
+    "OpenClaw state directory not found: ",
+    "Backup root must not grant group/other access: ",
+)
 GENERIC_VALUE_ERROR = "Validation failed; details are withheld so no file contents are shown"
 _LINE_BREAKS = re.compile(r"[\r\n\v\f\x1c-\x1e\x85  ]+")
 
@@ -79,26 +84,33 @@ def _print_json(data: Any) -> None:
 
 
 def safe_error_message(error: BaseException) -> str:
-    """A one-line diagnostic that names paths but never file contents."""
+    """A one-line diagnostic that names paths but never file contents.
+
+    Only fixed text is shown: the package's own messages, the operating
+    system's description of an errno and the file names the error carries.
+    Free-form exception text is withheld because it can quote input data."""
     if isinstance(error, ValueError):
         text = str(error)
         if text.startswith(KNOWN_VALUE_ERROR_PREFIXES):
             return _one_line(text)
         return GENERIC_VALUE_ERROR
     if isinstance(error, OSError):
-        if error.strerror:
-            text = error.strerror
-            filenames = [str(name) for name in (error.filename, error.filename2)
-                         if isinstance(name, (str, os.PathLike))]
-            if filenames:
-                text = f"{text}: {' -> '.join(filenames)}"
-            return _one_line(text)
-        if len(error.args) == 1 and isinstance(error.args[0], (str, os.PathLike)):
-            text = os.fspath(error.args[0])
-            if isinstance(error, NotADirectoryError) and isinstance(error.args[0], os.PathLike):
-                text = f"Not a directory: {text}"
-            return _one_line(text)
-        return f"{type(error).__name__} while running the command"
+        filenames = [os.fspath(name) for name in (error.filename, error.filename2)
+                     if isinstance(name, (str, os.PathLike))]
+        if len(error.args) == 1 and isinstance(error.args[0], os.PathLike):
+            filenames = [os.fspath(error.args[0])]
+        if isinstance(error.errno, int):
+            text = os.strerror(error.errno)
+        elif len(error.args) == 1 and isinstance(error.args[0], str) \
+                and error.args[0].startswith(KNOWN_OS_ERROR_PREFIXES):
+            return _one_line(error.args[0])
+        elif isinstance(error, NotADirectoryError) and filenames:
+            text = "Not a directory"
+        else:
+            text = f"{type(error).__name__} while running the command"
+        if filenames:
+            text = f"{text}: {' -> '.join(filenames)}"
+        return _one_line(text)
     return f"{type(error).__name__} while running the command"
 
 
@@ -127,7 +139,9 @@ def _absolute(path: Path) -> Path:
 class _Tracker:
     """Records what exists before a command runs, so a failure can report
     whether anything on disk changed. Only metadata is read, never file
-    contents, and inspection errors never replace the original diagnostic."""
+    contents, and inspection errors never replace the original diagnostic.
+    When the state cannot be inspected, the failure says so in a warning
+    instead of guessing that something changed."""
 
     missing: list[Path]
     root: Path | None = None
@@ -139,34 +153,37 @@ class _Tracker:
     @classmethod
     def for_backup(cls, destination: Path) -> _Tracker:
         root = _absolute(destination)
+        tracker = cls(missing=[], root=root)
         try:
-            tracker = cls(missing=_missing_ancestors(root), root=root)
+            tracker.missing = _missing_ancestors(root)
             if root.is_dir():
                 tracker.children = {entry.name for entry in root.iterdir()}
         except OSError:
-            tracker = cls(missing=[], root=root, inspect_failed=True)
+            tracker.inspect_failed = True
         return tracker
 
     @classmethod
     def for_output(cls, output: Path) -> _Tracker:
         path = _absolute(output)
+        tracker = cls(missing=[], output=path)
         try:
-            return cls(missing=_missing_ancestors(path), output=path,
-                       output_stat=_stat_key(path))
+            tracker.missing = _missing_ancestors(path)
+            tracker.output_stat = _stat_key(path)
         except OSError:
-            return cls(missing=[], output=path, inspect_failed=True)
+            tracker.inspect_failed = True
+        return tracker
 
     def changes(self) -> tuple[bool, list[str]]:
         """Return (changed, warnings) after a failure."""
-        if self.inspect_failed:
-            return True, ["Could not inspect the destination before the command ran; "
-                          "check it for partial changes."]
+        changed = False
         warnings: list[str] = []
         try:
             changed = any(path.exists() or path.is_symlink() for path in self.missing)
-            if self.output is not None and _stat_key(self.output) != self.output_stat:
+            if (self.output is not None and not self.inspect_failed
+                    and _stat_key(self.output) != self.output_stat):
                 changed = True
-            if self.root is not None and self.root.is_dir():
+            if (self.root is not None and not self.inspect_failed
+                    and self.root.is_dir()):
                 before = self.children or set()
                 for name in sorted({entry.name for entry in self.root.iterdir()} - before):
                     changed = True
@@ -177,8 +194,11 @@ class _Tracker:
                             "verified rollback checkpoint."
                         )
         except OSError:
-            return True, ["Could not inspect the destination after the failure; "
-                          "check it for partial changes."]
+            self.inspect_failed = True
+        if self.inspect_failed:
+            target = self.root or self.output
+            warnings.append(f"Could not inspect {target} for changes; check it for "
+                            "partial writes.")
         return changed, warnings
 
 

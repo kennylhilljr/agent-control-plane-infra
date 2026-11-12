@@ -318,6 +318,47 @@ class BackupCliTests(CliTestCase):
                         self.assertNotIn(CONTENT_MARKER, result[1] + result[2])
                         self.assertNotIn("Traceback", result[1] + result[2])
 
+    def test_os_error_text_does_not_disclose_contents(self) -> None:
+        errors = [
+            OSError(CONTENT_MARKER),
+            PermissionError(f"Permission denied: {CONTENT_MARKER}"),
+            OSError(errno.EIO, CONTENT_MARKER),
+            OSError(errno.EIO, CONTENT_MARKER, "/tmp/acp-file"),
+        ]
+        with fixture_root() as root:
+            for error in errors:
+                manager = mock.Mock()
+                manager.return_value.create.side_effect = error
+                with mock.patch.object(cli, "BackupManager", manager):
+                    argv = ["backup", "--backup-dir", str(root / "backups")]
+                    envelope = self.assert_json_failure(run_cli([*argv, "--json"]), "backup",
+                                                        changed=False)
+                    self.assertNotIn(CONTENT_MARKER, json.dumps(envelope))
+                    stderr = self.assert_text_failure(run_cli(argv))
+                    self.assertNotIn(CONTENT_MARKER, stderr)
+            manager = mock.Mock()
+            manager.return_value.create.side_effect = errors[-1]
+            with mock.patch.object(cli, "BackupManager", manager):
+                envelope = self.assert_json_failure(
+                    run_cli(["backup", "--backup-dir", str(root / "backups"), "--json"]),
+                    "backup", changed=False,
+                )
+            self.assertEqual(envelope["error"], f"{os.strerror(errno.EIO)}: /tmp/acp-file")
+
+    def test_inspection_failure_warns_without_claiming_a_change(self) -> None:
+        with fixture_root() as root:
+            destination = root / "backups"
+            denied = PermissionError(errno.EACCES, "Permission denied", str(destination))
+            with mock.patch.object(cli, "_missing_ancestors", side_effect=denied):
+                envelope = self.assert_json_failure(
+                    run_cli(["backup", "--source", str(root / "missing"), "--backup-dir",
+                             str(destination), "--json"]),
+                    "backup", changed=False,
+                )
+            self.assertIn("OpenClaw state directory not found", envelope["error"])
+            self.assertEqual(len(envelope["warnings"]), 1)
+            self.assertIn(f"Could not inspect {destination}", envelope["warnings"][0])
+
 
 class InventoryCliTests(CliTestCase):
     def setUp(self) -> None:
