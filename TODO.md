@@ -20,6 +20,12 @@ Legend:
 - [x] **AUTO** Back up OpenClaw configuration, state databases, and job definitions.
   Verified checkpoint: `/Users/bkh223/AgentPlatformBackups/openclaw-20260924T052012.596577Z`.
 - [x] **AUTO** Validate backup checksums and disposable restore.
+- [x] **AUTO** Check committed inventory evidence for leaks and over-redaction.
+  `python3 scripts/check_inventories.py` (run by `scripts/check.sh`) passes on
+  every committed `inventories/**/*.json`; `redact` now covers private keys,
+  passphrases, cookies, bearer values and plural/camelCase secret names while
+  keeping secret counts and token usage. Does not resolve the Agent-Engineers
+  credential triage below.
 - [!] **AUTO** Scan reports and repositories for committed secrets.
   Blocked on credential triage: the three new/current repositories pass, but
   Agent-Engineers contains 23 findings. Its ignored `.env`, generated `.env`,
