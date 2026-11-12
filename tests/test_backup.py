@@ -207,6 +207,10 @@ class BackupTests(unittest.TestCase):
             def side_effect(path: Path) -> str:
                 if path == target:
                     state["ran"] = True
+                    if error is FileNotFoundError:
+                        target.unlink()
+                    else:
+                        _rewrite(target)
                     raise error("injected")
                 return real_sha256(path)
             return mock.patch.object(backup, "_sha256", side_effect=side_effect)
@@ -222,6 +226,53 @@ class BackupTests(unittest.TestCase):
         """test_sha256_oserror_raises_source_changed: an OSError while
         hashing becomes SourceChangedDuringBackup."""
         self._sha256_failing_with(OSError)
+
+    def test_sha256_oserror_on_unchanged_file_keeps_its_error(self) -> None:
+        """An unreadable but unchanged file keeps its own OSError, since
+        stopping the Gateway would not fix it."""
+        real_sha256 = backup._sha256
+
+        def side_effect(path: Path) -> str:
+            if path.name == "jobs.json":
+                raise OSError(errno.EIO, "Input/output error")
+            return real_sha256(path)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = _make_source(root)
+            with mock.patch.object(backup, "_sha256", side_effect=side_effect):
+                with self.assertRaises(OSError) as raised:
+                    BackupManager(source, root / "backups").create()
+        self.assertNotIsInstance(raised.exception, backup.SourceChangedDuringBackup)
+        self.assertEqual(raised.exception.errno, errno.EIO)
+
+    def _created_after_enumeration(self, make) -> None:
+        exc_cls = backup.SourceChangedDuringBackup
+        state = {"ran": False}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = _make_source(root)
+
+            def hook(manager: BackupManager, path: Path, relative: PurePosixPath) -> None:
+                if not state["ran"]:
+                    state["ran"] = True
+                    make(source)
+
+            with mock.patch.object(backup.BackupManager, "_after_tarfile_add",
+                                   autospec=True, side_effect=hook):
+                with self.assertRaises(exc_cls) as raised:
+                    BackupManager(source, root / "backups").create()
+        self.assertTrue(state["ran"])
+        self.assertIn("cron/new", str(raised.exception))
+        self.assertIn("Stop the Gateway and retry.", str(raised.exception))
+
+    def test_file_created_after_enumeration_raises(self) -> None:
+        self._created_after_enumeration(
+            lambda source: (source / "cron" / "new-job.json").write_text("{}"))
+
+    def test_symlink_created_after_enumeration_raises(self) -> None:
+        self._created_after_enumeration(
+            lambda source: (source / "cron" / "new-link").symlink_to("jobs.json"))
 
     def test_file_changed_after_enumeration_before_hashing_raises(self) -> None:
         """test_file_changed_after_enumeration_before_hashing_raises: a

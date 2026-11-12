@@ -64,8 +64,14 @@ class BackupManager:
                 raise _source_changed(relative_posix)
             try:
                 digest = _sha256(path)
-            except OSError as error:
+            except FileNotFoundError as error:
                 raise _source_changed(relative_posix) from error
+            except OSError as error:
+                # An unreadable but unchanged file (EACCES, EIO, EMFILE) keeps
+                # its own error: stopping the Gateway would not fix it.
+                if _checked_snapshot(path, relative_posix) != pre_hash_snap:
+                    raise _source_changed(relative_posix) from error
+                raise
             post_hash_snap = _checked_snapshot(path, relative_posix)
             if post_hash_snap != pre_hash_snap:
                 raise _source_changed(relative_posix)
@@ -98,6 +104,17 @@ class BackupManager:
                 relative_posix = str(PurePosixPath(*path.relative_to(self.source).parts))
                 if _checked_snapshot(path, relative_posix) != post_hash_stats[path]:
                     raise _source_changed(relative_posix)
+            # A file or link created or removed after enumeration would be
+            # missing from (or stale in) the checkpoint, so walk the tree again.
+            now_files, now_links = self._scan()
+            added_or_removed = sorted(
+                {_relative_posix(self.source, path) for path in set(now_files) ^ set(files)}
+                | {name for name in set(now_links) ^ set(links)}
+                | {name for name in set(now_links) & set(links)
+                   if now_links[name] != links[name]}
+            )
+            if added_or_removed:
+                raise _source_changed(added_or_removed[0])
         archive_path.chmod(0o600)
         self.verify_archive(archive_path, expected)
         manifest = {
@@ -130,21 +147,31 @@ class BackupManager:
         snapshots, and symbolic links (relative path to target) to record.
         Links are never followed: rglob does not descend into symlinked
         directories, and a link's target is read, not opened."""
+        files, links = self._scan()
+        enum_stats = {
+            path: _checked_snapshot(path, _relative_posix(self.source, path)) for path in files
+        }
+        self._after_enumeration()
+        return files, enum_stats, links
+
+    def _scan(self) -> tuple[list[Path], dict[str, str]]:
+        """Walk the source once: sorted regular files and sorted links."""
         files: list[Path] = []
-        enum_stats: dict[Path, tuple[int, int, int, int]] = {}
         links: dict[str, str] = {}
         for path in self.source.rglob("*"):
             relative = path.relative_to(self.source)
             if relative.parts and relative.parts[0] in self.EXCLUDED_TOP_LEVEL:
                 continue
-            if path.is_symlink():
-                links[str(PurePosixPath(*relative.parts))] = os.readlink(path)
-                continue
+            relative_posix = str(PurePosixPath(*relative.parts))
+            try:
+                if path.is_symlink():
+                    links[relative_posix] = os.readlink(path)
+                    continue
+            except FileNotFoundError as error:
+                raise _source_changed(relative_posix) from error
             if path.is_file():
-                enum_stats[path] = _checked_snapshot(path, str(PurePosixPath(*relative.parts)))
                 files.append(path)
-        self._after_enumeration()
-        return sorted(files), enum_stats, dict(sorted(links.items()))
+        return sorted(files), dict(sorted(links.items()))
 
     # Phase hooks. They do nothing in production; tests patch them to change
     # the source tree between backup phases.
@@ -195,6 +222,10 @@ class BackupManager:
 def _stat_snapshot(path: Path) -> tuple[int, int, int, int]:
     stat = os.lstat(path)
     return (stat.st_size, stat.st_mtime_ns, stat.st_ino, stat.st_mode)
+
+
+def _relative_posix(source: Path, path: Path) -> str:
+    return str(PurePosixPath(*path.relative_to(source).parts))
 
 
 def _source_changed(relative_posix: str) -> SourceChangedDuringBackup:
