@@ -152,6 +152,8 @@ class CheckInventoriesTests(unittest.TestCase):
             "sk-short",
             "ghp" + "_" + "Q" * 19,
             "maskghp" + "_" + body,
+            "\u00e9sk-" + body,
+            "\u4efbsk-" + body,
         ]
         for text in ignored:
             with self.subTest(text=text):

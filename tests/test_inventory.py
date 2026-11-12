@@ -203,7 +203,7 @@ class InventoryTests(unittest.TestCase):
         numeric_keys = [
             "plaintext_secret_count", "unresolved_secret_ref_count", "token_count", "api_key_count",
             "input_tokens", "output_tokens", "projected_always_on_tokens", "secretCount",
-            "SECRETCOUNT", "apikeycount",
+            "SECRETCOUNT", "apikeycount", "sEcReTcOuNt", "Secret_TOKENS",
         ]
         for key in numeric_keys:
             for value in (0, 7, 1.5):
@@ -224,7 +224,7 @@ class InventoryTests(unittest.TestCase):
         status_keys = [
             "token_status", "secret_configured", "credential_configured", "api_key_present",
             "private_key_present", "password-status", "cookieConfigured", "PRIVATEKEYPRESENT",
-            "secretconfigured", "Private.Key.Status",
+            "secretconfigured", "Private.Key.Status", "privateKEYPRESENT", "pRiVaTeKeYpReSeNt",
         ]
         for key in status_keys:
             for value in (True, False, None):

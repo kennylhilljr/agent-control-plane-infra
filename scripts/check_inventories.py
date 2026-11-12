@@ -41,13 +41,13 @@ REASON_CREDENTIAL_NAME = "member name looks like a credential"
 # like a private key block to secret scanners.
 _PEM_DASHES = "-" * 5
 # Value prefixes stay precise: a prefix must start at a token boundary (the
-# start of the string or a non-alphanumeric character) and be followed by at
-# least 20 key characters. Embedded keys such as "key=sk-..." or "(ghp_...)"
+# start of the string or a character that is not a Unicode letter or digit)
+# and be followed by at least 20 key characters. Embedded keys such as "key=sk-..." or "(ghp_...)"
 # are found, while prose such as "task-list" or "ask-for-help" is not.
 _KEY_BODY_MIN = 20
 CREDENTIAL_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{%d,}" % _KEY_BODY_MIN),
-    re.compile(r"(?<![A-Za-z0-9])ghp_[A-Za-z0-9_-]{%d,}" % _KEY_BODY_MIN),
+    re.compile(r"(?<![^\W_])sk-[A-Za-z0-9_-]{%d,}" % _KEY_BODY_MIN),
+    re.compile(r"(?<![^\W_])ghp_[A-Za-z0-9_-]{%d,}" % _KEY_BODY_MIN),
     re.compile(
         _PEM_DASHES
         + r"BEGIN (?:(?:RSA|EC|DSA|ENCRYPTED|OPENSSH) )?PRIVATE KEY"

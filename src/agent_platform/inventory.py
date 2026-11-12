@@ -73,16 +73,18 @@ def _key_words(key: str) -> list[str]:
 
 
 def _metadata_suffix(key: str) -> str:
+    suffixes = _NUMERIC_METADATA_SUFFIXES | _STATUS_METADATA_SUFFIXES
     segments = _key_segments(key)
-    if len(segments) > 1:
+    if len(segments) > 1 and segments[-1] in suffixes:
         return segments[-1]
     words = _key_words(key)
-    if len(words) > 1:
+    if len(words) > 1 and words[-1] in suffixes:
         return words[-1]
-    # Compact names ("PRIVATEKEYPRESENT", "secretcount") carry the suffix
-    # inline. It only counts when what precedes it still names a secret.
+    # Compact or oddly cased names ("PRIVATEKEYPRESENT", "sEcReTcOuNt") carry
+    # the suffix inline. It only counts when what precedes it still names a
+    # secret.
     normalized = normalize_key(key)
-    for suffix in _NUMERIC_METADATA_SUFFIXES | _STATUS_METADATA_SUFFIXES:
+    for suffix in suffixes:
         if normalized.endswith(suffix) and _has_sensitive_token(normalized[: -len(suffix)]):
             return suffix
     return ""
