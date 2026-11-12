@@ -17,6 +17,7 @@ REDACTED = "<redacted>"
 
 # A key is split into lowercase words on any non-alphanumeric separator and on
 # camelCase boundaries ("clientSecret" -> ["client", "secret"]).
+_KEY_SEPARATOR = re.compile(r"[^A-Za-z0-9]+")
 _KEY_WORD = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|[0-9]+")
 
 # A single word is sensitive when it is, or ends with, one of these roots,
@@ -47,20 +48,37 @@ AUDIT_STATUS_ALLOWLIST: dict[str, frozenset[str]] = {
 }
 
 
+def _key_segments(key: str) -> list[str]:
+    return [segment.lower() for segment in _KEY_SEPARATOR.split(key) if segment]
+
+
 def _key_words(key: str) -> list[str]:
     return [word.lower() for word in _KEY_WORD.findall(key)]
 
 
 def is_sensitive_key(key: str) -> bool:
+    # Check both the camelCase split and the plain lowercased separator split,
+    # so oddly cased keys such as "PaSsWoRd" or "pRiVaTe_KeY", which the
+    # camelCase split breaks apart, still match case-insensitively.
+    for words in (_key_words(key), _key_segments(key)):
+        if any(_SENSITIVE_WORD.match(word) for word in words):
+            return True
+        if any(pair in _SENSITIVE_PAIRS for pair in zip(words, words[1:])):
+            return True
+    return False
+
+
+def _metadata_suffix(key: str) -> str:
+    segments = _key_segments(key)
+    if len(segments) > 1:
+        return segments[-1]
     words = _key_words(key)
-    if any(_SENSITIVE_WORD.match(word) for word in words):
-        return True
-    return any(pair in _SENSITIVE_PAIRS for pair in zip(words, words[1:]))
+    return words[-1] if len(words) > 1 else ""
 
 
 def _keep_sensitive_value(key: str, value: Any) -> bool:
-    words = _key_words(key)
-    suffix = words[-1] if len(words) > 1 else ""
+    # An unrecognised suffix only ever falls through to redaction.
+    suffix = _metadata_suffix(key)
     if suffix in _NUMERIC_METADATA_SUFFIXES:
         return isinstance(value, (int, float)) and not isinstance(value, bool)
     if suffix in _STATUS_METADATA_SUFFIXES:

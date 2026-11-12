@@ -82,7 +82,7 @@ class CheckInventoriesTests(unittest.TestCase):
                 "providers": {"openai": {"credential_configured": True}},
                 "usage": {"input_tokens": 12, "output_tokens": 3},
                 "token": REDACTED,
-                "note": "task-list and disk-usage are ordinary words",
+                "note": "plain text without credential shapes",
             },
         )
         before = path.read_bytes()
@@ -110,13 +110,15 @@ class CheckInventoriesTests(unittest.TestCase):
                 "b": {"c": {"d": "prefix " + secrets["openai"]}},
                 "e": secrets["github"],
                 "f": "bearer\t" + "x",
+                "g": "prefix" + secrets["openai"],
             },
         )
         code, findings, stdout, stderr = self.run_checker(str(path))
         self.assertEqual(code, 1)
         self.assertEqual(
             self.locations(findings),
-            {("/a/0/header", CREDENTIAL), ("/b/c/d", CREDENTIAL), ("/e", CREDENTIAL), ("/f", CREDENTIAL)},
+            {("/a/0/header", CREDENTIAL), ("/b/c/d", CREDENTIAL), ("/e", CREDENTIAL), ("/f", CREDENTIAL),
+             ("/g", CREDENTIAL)},
         )
         self.assertNoLeak(secrets["bearer"].split()[1], stdout, stderr)
         self.assertNoLeak(secrets["openai"], stdout, stderr)
@@ -270,7 +272,7 @@ class CheckInventoriesTests(unittest.TestCase):
         secret = openai_key()
         token = github_token()
         # Parsed file: credentials in the directory name, file name and a key.
-        directory = f"dir-{secret}"
+        directory = f"dir{secret}"
         name = f"evidence{token}.json"
         path = self.write(f"{directory}/{name}", {f"id-{secret}": {"password": "v"}, "x": [secret]})
         code, findings, stdout, stderr = self.run_checker(str(path))
@@ -285,7 +287,7 @@ class CheckInventoriesTests(unittest.TestCase):
             self.assertNoLeak(value, stdout, stderr)
 
         # Error path: unreadable, invalid UTF-8 and invalid JSON files with credential names.
-        missing = self.dir / f"gone-{secret}.json"
+        missing = self.dir / f"gone{secret}.json"
         undecodable = self.dir / f"raw{token}.json"
         undecodable.write_bytes(b"\xff")
         unparsable = self.dir / f"{secret}" / "x.json"

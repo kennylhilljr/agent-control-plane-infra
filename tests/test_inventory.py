@@ -167,6 +167,8 @@ class InventoryTests(unittest.TestCase):
             "tokens", "TOKENS", "Tokens",
             "secrets", "SECRETS", "client_secrets",
             "passwords", "PASSWORDS", "user_passwords",
+            # Irregular casing that a camelCase split alone would break apart.
+            "PaSsWoRd", "tOkEn", "pRiVaTe_KeY", "aPi_kEy", "SeCrEtS", "cLiEnTsEcReT", "pAsSpHrAsE",
         ]
         for key in sensitive:
             with self.subTest(key=key):

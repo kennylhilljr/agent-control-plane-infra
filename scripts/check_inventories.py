@@ -40,18 +40,19 @@ REASON_CREDENTIAL_NAME = "member name looks like a credential"
 # The PEM marker is assembled from pieces so this file does not itself look
 # like a private key block to secret scanners.
 _PEM_DASHES = "-" * 5
-# "sk-" must not follow a letter or digit, so ordinary words such as
-# "task-list" or "disk-usage" are not reported; a key after a separator
-# ("report-sk-...", "a_sk-...") or at the start is. "ghp_" is matched anywhere.
+# Prefixes are matched anywhere in a string, including inside a longer word
+# ("reportsk-..."), so an embedded key is never missed or printed. The cost is
+# that prose such as "task-list" is reported too; review such a finding by
+# its pointer rather than weakening the pattern.
 CREDENTIAL_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]+"),
+    re.compile(r"sk-[A-Za-z0-9_-]+"),
     re.compile(r"ghp_[A-Za-z0-9_-]+"),
     re.compile(
         _PEM_DASHES
         + r"BEGIN (?:(?:RSA|EC|DSA|ENCRYPTED|OPENSSH) )?PRIVATE KEY"
         + _PEM_DASHES
     ),
-    re.compile(r"(?<![A-Za-z0-9])bearer\s+\S+", re.IGNORECASE),
+    re.compile(r"bearer\s+\S+", re.IGNORECASE),
 )
 
 
