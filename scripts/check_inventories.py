@@ -31,9 +31,11 @@ from agent_platform.inventory import REDACTED, redact  # noqa: E402
 REASON_UNREADABLE = "unreadable file"
 REASON_INVALID_UTF8 = "invalid UTF-8"
 REASON_INVALID_JSON = "invalid JSON"
+REASON_DUPLICATE_MEMBER = "duplicate object member"
 REASON_REDACTION_FAILED = "redaction failed"
 REASON_REDACTION_CHANGED = "value changes under redaction"
 REASON_CREDENTIAL = "value looks like a credential"
+REASON_CREDENTIAL_NAME = "member name looks like a credential"
 
 # The PEM marker is assembled from pieces so this file does not itself look
 # like a private key block to secret scanners.
@@ -113,13 +115,45 @@ def redaction_changes(original: Any, redacted: Any, path: tuple[str, ...] = ()) 
         yield path
 
 
-def credential_strings(value: Any, path: tuple[str, ...] = ()) -> Iterator[tuple[str, ...]]:
+def credential_strings(value: Any, path: tuple[str, ...] = ()) -> Iterator[tuple[tuple[str, ...], str]]:
     if isinstance(value, str):
         if looks_like_credential(value):
-            yield path
+            yield path, REASON_CREDENTIAL
         return
     for name, item in _children(value):
+        if isinstance(value, dict) and looks_like_credential(name):
+            yield (*path, name), REASON_CREDENTIAL_NAME
         yield from credential_strings(item, (*path, name))
+
+
+class _DuplicateMember(ValueError):
+    pass
+
+
+class _NonStandardConstant(ValueError):
+    pass
+
+
+def _unique_members(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    document: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in document:
+            raise _DuplicateMember
+        document[key] = value
+    return document
+
+
+def _reject_constant(_: str) -> Any:
+    raise _NonStandardConstant
+
+
+def parse_json(text: str) -> Any:
+    """Parse strict RFC 8259 JSON: no NaN/Infinity and no duplicate member names.
+
+    A duplicate name would let a credential hide behind a later clean value,
+    because only the last one survives parsing.
+    """
+    return json.loads(text, object_pairs_hook=_unique_members, parse_constant=_reject_constant)
 
 
 def check_file(path: Path, shown: str) -> list[dict[str, str]]:
@@ -135,7 +169,9 @@ def check_file(path: Path, shown: str) -> list[dict[str, str]]:
     except Exception:
         return [finding((), REASON_INVALID_UTF8)]
     try:
-        document = json.loads(text)
+        document = parse_json(text)
+    except _DuplicateMember:
+        return [finding((), REASON_DUPLICATE_MEMBER)]
     except Exception:
         return [finding((), REASON_INVALID_JSON)]
 
@@ -150,7 +186,7 @@ def check_file(path: Path, shown: str) -> list[dict[str, str]]:
         except Exception:
             findings.append(finding((), REASON_REDACTION_FAILED))
     try:
-        findings.extend(finding(location, REASON_CREDENTIAL) for location in credential_strings(document))
+        findings.extend(finding(location, reason) for location, reason in credential_strings(document))
     except Exception:
         findings.append(finding((), REASON_REDACTION_FAILED))
     return findings

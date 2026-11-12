@@ -16,6 +16,7 @@ REDACTED = "<redacted>"
 
 CHANGED = "value changes under redaction"
 CREDENTIAL = "value looks like a credential"
+CREDENTIAL_NAME = "member name looks like a credential"
 
 
 def openai_key() -> str:
@@ -181,6 +182,36 @@ class CheckInventoriesTests(unittest.TestCase):
         self.assertNoLeak(secret, stdout, stderr)
         self.assertNotIn("Traceback", stderr)
 
+    def test_duplicate_members_and_nonstandard_constants_fail(self) -> None:
+        secret = bearer()
+        duplicate = self.dir / "duplicate.json"
+        duplicate.write_text('{"a": {"auth": ' + json.dumps(secret) + ', "auth": "safe"}}', encoding="utf-8")
+        files = [str(duplicate)]
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            path = self.dir / f"constant{constant}.json"
+            path.write_text('{"ok": ' + constant + "}", encoding="utf-8")
+            files.append(str(path))
+        code, findings, stdout, stderr = self.run_checker(*files)
+        self.assertEqual(code, 1)
+        self.assertEqual(
+            [(item["file"], item["pointer"], item["reason"]) for item in findings],
+            [(files[0], "", "duplicate object member")] + [(name, "", "invalid JSON") for name in files[1:]],
+        )
+        self.assertNoLeak(secret.split()[1], stdout, stderr)
+
+    def test_credential_shaped_member_names_are_reported_and_masked(self) -> None:
+        secret = openai_key()
+        token = github_token()
+        path = self.write("names.json", {secret: "safe", "outer": [{f"x{token}": 1}], "fine": {"name": "v"}})
+        code, findings, stdout, stderr = self.run_checker(str(path))
+        self.assertEqual(code, 1)
+        self.assertEqual(
+            self.locations(findings),
+            {(f"/{REDACTED}", CREDENTIAL_NAME), (f"/outer/0/{REDACTED}", CREDENTIAL_NAME)},
+        )
+        self.assertNoLeak(secret, stdout, stderr)
+        self.assertNoLeak(token, stdout, stderr)
+
     def test_invalid_utf8_and_missing_file(self) -> None:
         bad_bytes = self.dir / "latin.json"
         bad_bytes.write_bytes(b'{"name": "\xff\xfe"}')
@@ -248,7 +279,7 @@ class CheckInventoriesTests(unittest.TestCase):
         self.assertEqual({item["file"] for item in findings}, {masked_file})
         self.assertEqual(
             self.locations(findings),
-            {(f"/{REDACTED}/password", CHANGED), ("/x/0", CREDENTIAL)},
+            {(f"/{REDACTED}", CREDENTIAL_NAME), (f"/{REDACTED}/password", CHANGED), ("/x/0", CREDENTIAL)},
         )
         for value in (secret, token, bearer()):
             self.assertNoLeak(value, stdout, stderr)
