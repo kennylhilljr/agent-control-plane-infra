@@ -27,16 +27,35 @@ python3 --version
 Run from the repository root:
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s tests -v
 ```
 
-The tests are standard library `unittest` cases, so the command above needs no packages. pytest also runs them, using the settings in `pyproject.toml`, once the optional `test` extra is installed (`python3 -m pip install -e ".[test]"`). `__pycache__/` and `*.pyc` are ignored by Git.
+Each test module puts the repository `src/` directory on `sys.path` itself, so bare discovery and direct runs such as `python3 tests/test_inventory.py` work without a `PYTHONPATH` prefix (the older `PYTHONPATH=src` form still works). The tests are standard library `unittest` cases, so the command above needs no packages. `tests/test_tmpdirs.py` reruns the full suite in fresh subprocesses with `TMPDIR=/tmp` and with `TMPDIR` under a disposable home's `.openclaw/tmp`, so both temporary-directory setups are covered by the suite itself; it never touches real OpenClaw state. pytest also runs them, using the settings in `pyproject.toml`, once the optional `test` extra is installed (`python3 -m pip install -e ".[test]"`). `__pycache__/` and `*.pyc` are ignored by Git.
 
 No formatter, linter or type checker is configured in `pyproject.toml`. The handoff notes ask for a secret scan before reporting progress:
 
 ```bash
 gitleaks dir . --no-banner --redact --exit-code 1
 ```
+
+Check the committed evidence under `inventories/` (standard library only, read-only):
+
+```bash
+python3 scripts/check_inventories.py                            # every inventories/**/*.json
+python3 scripts/check_inventories.py inventories/latest.json    # only the named files
+```
+
+With no arguments it checks every `inventories/**/*.json` in the repository; file arguments (relative to the working directory) limit it to those files, for example the changed ones. It fails a file that cannot be read, is not UTF-8 or is not strict JSON (`NaN`/`Infinity` constants and duplicate member names are rejected, so a credential cannot hide behind a later duplicate), that `redact` would change, or that holds a string value or member name shaped like a credential (`sk-` or `ghp_` keys that start at a token boundary, meaning the start of the string or a character that is not a letter or digit, and have at least 20 key characters, so `task-list` is not flagged; PEM private key blocks; `Bearer <value>`). It exits 0 when every file is clean and 1 otherwise, and prints a JSON array of `{"file", "pointer", "reason"}` objects, where `pointer` is an RFC 6901 JSON Pointer and `reason` is a fixed string. Values, exception text and file excerpts are never printed, and a file name, directory name or pointer component that looks like a credential is shown as `<redacted>`. `scripts/check.sh` runs it. If it flags committed evidence, report the file and pointer for operator review rather than editing the evidence.
+
+This standalone checker, with its diagnostic array instead of the result envelope, is a deliberate exception to the single-command automation interface in `MIGRATION_SPEC.md` section 7: it is a read-only repository check, not an operational subcommand.
+
+`redact` rules fail closed on key names: a key is lowercased, `_`, `-` and `.` are removed, and it is sensitive when the result contains `apikey`, `privatekey`, `token`, `secret`, `password`, `passphrase`, `cookie`, `bearer`, `credential` or `authorization` anywhere, so `PRIVATEKEYPRESENT` matches and so do `tokenizer`, `secretary` and `credentials`; `monkey` or `public_key_id` do not. Values under sensitive keys become `<redacted>`, with these metadata exceptions:
+
+- keys ending in `_count` or `_tokens` (`plaintext_secret_count`, `input_tokens`) keep int and float values only; bools, strings and containers are redacted;
+- keys ending in `_status`, `_configured` or `_present` (`credential_configured`) keep bool and null only;
+- the one allowlisted string is `secrets_audit_status` = `clean`, exactly; other strings, case or whitespace variants and other key spellings are redacted;
+- a compact name such as `PRIVATEKEYPRESENT` or `secretcount` uses the same suffixes when the part before the suffix is itself sensitive, so `maxtokens` stays redacted;
+- any other sensitive key keeps bool values only. URL query parameters get no metadata exceptions.
 
 ## Code conventions
 

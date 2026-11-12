@@ -13,10 +13,94 @@ from typing import Any, Callable
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
-SENSITIVE_KEY = re.compile(
-    r"(^|[_-])(api[_-]?key|token|secret|password|credential|authorization)($|[_-])",
-    re.IGNORECASE,
+REDACTED = "<redacted>"
+
+# Key names fail closed: a key is normalized by lowercasing it and removing
+# "_", "-" and ".", and is sensitive when any of these tokens appears anywhere
+# in the result. Compact or oddly cased names such as "PRIVATEKEYPRESENT" or
+# "x-Auth.Token" therefore match. Words that merely contain a token, such as
+# "tokenizer" or "secretary", are redacted too; that is the accepted cost.
+_KEY_STRIP = re.compile(r"[_.\-]")
+SENSITIVE_KEY_TOKENS: tuple[str, ...] = (
+    "apikey",
+    "privatekey",
+    "token",
+    "secret",
+    "password",
+    "passphrase",
+    "cookie",
+    "bearer",
+    "credential",
+    "authorization",
 )
+
+# Splits used only to find a metadata suffix: separators, then camelCase words.
+_KEY_SEPARATOR = re.compile(r"[^A-Za-z0-9]+")
+_KEY_WORD = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|[0-9]+")
+
+# Suffix words that mark a sensitive key as metadata about a secret rather
+# than the secret itself. Numeric suffixes keep int/float values only; status
+# suffixes keep bool/None only. Everything else under the key is redacted.
+_NUMERIC_METADATA_SUFFIXES = frozenset({"count", "tokens"})
+_STATUS_METADATA_SUFFIXES = frozenset({"status", "configured", "present"})
+
+# Owner-approved exception: the committed OpenClaw validation evidence records
+# the result of a secrets audit as the literal string "clean". Only this exact
+# key and exact value are kept; any other string under the key is redacted.
+AUDIT_STATUS_ALLOWLIST: dict[str, frozenset[str]] = {
+    "secrets_audit_status": frozenset({"clean"}),
+}
+
+
+def normalize_key(key: str) -> str:
+    return _KEY_STRIP.sub("", key.lower())
+
+
+def _has_sensitive_token(normalized: str) -> bool:
+    return any(token in normalized for token in SENSITIVE_KEY_TOKENS)
+
+
+def is_sensitive_key(key: str) -> bool:
+    return _has_sensitive_token(normalize_key(key))
+
+
+def _key_segments(key: str) -> list[str]:
+    return [segment.lower() for segment in _KEY_SEPARATOR.split(key) if segment]
+
+
+def _key_words(key: str) -> list[str]:
+    return [word.lower() for word in _KEY_WORD.findall(key)]
+
+
+def _metadata_suffix(key: str) -> str:
+    suffixes = _NUMERIC_METADATA_SUFFIXES | _STATUS_METADATA_SUFFIXES
+    segments = _key_segments(key)
+    if len(segments) > 1 and segments[-1] in suffixes:
+        return segments[-1]
+    words = _key_words(key)
+    if len(words) > 1 and words[-1] in suffixes:
+        return words[-1]
+    # Compact or oddly cased names ("PRIVATEKEYPRESENT", "sEcReTcOuNt") carry
+    # the suffix inline. It only counts when what precedes it still names a
+    # secret.
+    normalized = normalize_key(key)
+    for suffix in suffixes:
+        if normalized.endswith(suffix) and _has_sensitive_token(normalized[: -len(suffix)]):
+            return suffix
+    return ""
+
+
+def _keep_sensitive_value(key: str, value: Any) -> bool:
+    # An unrecognised suffix only ever falls through to redaction.
+    suffix = _metadata_suffix(key)
+    if suffix in _NUMERIC_METADATA_SUFFIXES:
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if suffix in _STATUS_METADATA_SUFFIXES:
+        if value is None or isinstance(value, bool):
+            return True
+        allowed = AUDIT_STATUS_ALLOWLIST.get(key)
+        return isinstance(value, str) and allowed is not None and value in allowed
+    return isinstance(value, bool)
 
 
 @dataclass(frozen=True)
@@ -54,8 +138,8 @@ def run_command(command: tuple[str, ...], timeout: float = 5.0) -> CommandResult
 
 
 def redact(value: Any, key: str = "") -> Any:
-    if SENSITIVE_KEY.search(key) and not isinstance(value, bool):
-        return "<redacted>"
+    if is_sensitive_key(key):
+        return value if _keep_sensitive_value(key, value) else REDACTED
     if isinstance(value, dict):
         return {name: redact(item, str(name)) for name, item in value.items()}
     if isinstance(value, list):
@@ -73,7 +157,7 @@ def _redact_url(value: str) -> str:
     except ValueError:
         return "<redacted-url>"
     query = [
-        (name, "<redacted>" if SENSITIVE_KEY.search(name) else item)
+        (name, REDACTED if is_sensitive_key(name) else item)
         for name, item in parse_qsl(parts.query, keep_blank_values=True)
     ]
     hostname = parts.hostname or ""
