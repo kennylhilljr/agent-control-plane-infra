@@ -169,6 +169,11 @@ class InventoryTests(unittest.TestCase):
             "passwords", "PASSWORDS", "user_passwords",
             # Irregular casing that a camelCase split alone would break apart.
             "PaSsWoRd", "tOkEn", "pRiVaTe_KeY", "aPi_kEy", "SeCrEtS", "cLiEnTsEcReT", "pAsSpHrAsE",
+            # Compact and dotted names fail closed after normalization.
+            "PRIVATEKEYPRESENT", "PrivateKEYValue", "OPENAIAPIKEY", "x.auth.TOKEN", "Api.Key",
+            "private.key", "AUTHORIZATIONHEADER", "SESSIONCOOKIEJAR", "DBPASSWORDHASH",
+            # Words that merely contain a token are redacted too (fail closed).
+            "tokenizer", "Tokenizer", "secretary", "credentials", "credentials_method",
         ]
         for key in sensitive:
             with self.subTest(key=key):
@@ -178,9 +183,9 @@ class InventoryTests(unittest.TestCase):
                 self.assertEqual(redact({key: {"inner": secret}}), {key: REDACTED})
 
         unrelated = [
-            "tokenizer", "Tokenizer", "monkey", "keyboard", "key", "public_key_id", "name",
-            "status", "secretary", "passage", "cookbook", "auth_policy", "auth_status",
-            "credentials_method", "path", "turnkey",
+            "monkey", "keyboard", "key", "public_key_id", "name", "status", "passage",
+            "cookbook", "auth_policy", "auth_status", "path", "turnkey", "private", "api",
+            "apiversion", "keyprivate", "task-list",
         ]
         for key in unrelated:
             with self.subTest(key=key):
@@ -198,6 +203,7 @@ class InventoryTests(unittest.TestCase):
         numeric_keys = [
             "plaintext_secret_count", "unresolved_secret_ref_count", "token_count", "api_key_count",
             "input_tokens", "output_tokens", "projected_always_on_tokens", "secretCount",
+            "SECRETCOUNT", "apikeycount",
         ]
         for key in numeric_keys:
             for value in (0, 7, 1.5):
@@ -211,10 +217,14 @@ class InventoryTests(unittest.TestCase):
         # metadata suffix is redacted even when its value is a number.
         self.assertEqual(redact({"job_count": "3", "enabled_count": 2}), {"job_count": "3", "enabled_count": 2})
         self.assertEqual(redact({"tokens_total": 4, "tokens": 4}), {"tokens_total": REDACTED, "tokens": REDACTED})
+        # A compact suffix counts only when the rest still names a secret.
+        self.assertEqual(redact({"maxtokens": 4, "PRESENT": 1}), {"maxtokens": REDACTED, "PRESENT": 1})
+        self.assertEqual(redact({"PRIVATEKEYPRESENT": "yes"}), {"PRIVATEKEYPRESENT": REDACTED})
 
         status_keys = [
             "token_status", "secret_configured", "credential_configured", "api_key_present",
-            "private_key_present", "password-status", "cookieConfigured",
+            "private_key_present", "password-status", "cookieConfigured", "PRIVATEKEYPRESENT",
+            "secretconfigured", "Private.Key.Status",
         ]
         for key in status_keys:
             for value in (True, False, None):
@@ -256,7 +266,8 @@ class InventoryTests(unittest.TestCase):
                 ({"clientSecret": secret, "label": "kept"},),
                 {"deep": {"private_key": secret, "plaintext_secret_count": 0, "secrets_audit_status": "clean"}},
             ],
-            "tokenizer": "kept",
+            "tokenizer": "dropped",
+            "label": "kept",
         }
         snapshot = json.dumps(source, sort_keys=True)
         sanitized = redact(source)
@@ -271,7 +282,8 @@ class InventoryTests(unittest.TestCase):
             sanitized["outer"][2]["deep"],
             {"private_key": REDACTED, "plaintext_secret_count": 0, "secrets_audit_status": "clean"},
         )
-        self.assertEqual(sanitized["tokenizer"], "kept")
+        self.assertEqual(sanitized["tokenizer"], REDACTED)
+        self.assertEqual(sanitized["label"], "kept")
         self.assertEqual(redact(sanitized), sanitized)
         self.assertEqual(redact({"tokens": REDACTED}), {"tokens": REDACTED})
 

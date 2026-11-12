@@ -110,7 +110,8 @@ class CheckInventoriesTests(unittest.TestCase):
                 "b": {"c": {"d": "prefix " + secrets["openai"]}},
                 "e": secrets["github"],
                 "f": "bearer\t" + "x",
-                "g": "prefix" + secrets["openai"],
+                "g": "key=" + secrets["openai"],
+                "h": "(" + secrets["github"] + ")",
             },
         )
         code, findings, stdout, stderr = self.run_checker(str(path))
@@ -118,11 +119,49 @@ class CheckInventoriesTests(unittest.TestCase):
         self.assertEqual(
             self.locations(findings),
             {("/a/0/header", CREDENTIAL), ("/b/c/d", CREDENTIAL), ("/e", CREDENTIAL), ("/f", CREDENTIAL),
-             ("/g", CREDENTIAL)},
+             ("/g", CREDENTIAL), ("/h", CREDENTIAL)},
         )
         self.assertNoLeak(secrets["bearer"].split()[1], stdout, stderr)
         self.assertNoLeak(secrets["openai"], stdout, stderr)
         self.assertNoLeak(secrets["github"], stdout, stderr)
+
+    def test_value_prefixes_need_a_boundary_and_a_key_body(self) -> None:
+        sys.path.insert(0, str(CHECKER.parent))
+        self.addCleanup(sys.path.remove, str(CHECKER.parent))
+        from check_inventories import looks_like_credential, mask_component
+
+        body = "Q" * 20
+        flagged = [
+            "sk-" + body,
+            "sk-proj-" + body,
+            "key=sk-" + body,
+            "x_sk-" + body,
+            "see (sk-" + body + ")",
+            "token:ghp" + "_" + body,
+            "line one\nsk-" + body,
+        ]
+        for text in flagged:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_credential(text))
+        ignored = [
+            "task-list",
+            "ask-for-help",
+            "desk-" + body,
+            "reportsk-" + body,
+            "sk-" + "Q" * 19,
+            "sk-short",
+            "ghp" + "_" + "Q" * 19,
+            "maskghp" + "_" + body,
+        ]
+        for text in ignored:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_credential(text))
+        # Display masking stays greedy so a glued key is never printed.
+        for text in ("reportsk-" + body, "maskghp" + "_" + body, "dirsk-x"):
+            with self.subTest(mask=text):
+                self.assertEqual(mask_component(text), REDACTED)
+        path = self.write("prose.json", {"steps": ["task-list", "ask-for-help", "risk-free"]})
+        self.assertEqual(self.run_checker(str(path))[:2], (0, []))
 
     def test_private_key_blocks(self) -> None:
         kinds = ["", "RSA", "EC", "ENCRYPTED", "OPENSSH"]
@@ -204,7 +243,7 @@ class CheckInventoriesTests(unittest.TestCase):
     def test_credential_shaped_member_names_are_reported_and_masked(self) -> None:
         secret = openai_key()
         token = github_token()
-        path = self.write("names.json", {secret: "safe", "outer": [{f"x{token}": 1}], "fine": {"name": "v"}})
+        path = self.write("names.json", {secret: "safe", "outer": [{f"x-{token}": 1}], "fine": {"name": "v"}})
         code, findings, stdout, stderr = self.run_checker(str(path))
         self.assertEqual(code, 1)
         self.assertEqual(
@@ -244,6 +283,8 @@ class CheckInventoriesTests(unittest.TestCase):
             "secret_status": [True, False, None],
             "api_key_configured": [True, None],
             "private_key_present": [False],
+            "PRIVATEKEYPRESENT": [True, None],
+            "secretcount": [2],
             "secrets_audit_status": ["clean", True, None],
         }
         for key, values in cases.items():
@@ -258,6 +299,8 @@ class CheckInventoriesTests(unittest.TestCase):
             "secret_status": ["opaque", 1, ["x"], {"k": "v"}],
             "api_key_configured": ["yes", [], {}],
             "private_key_present": ["opaque", 0],
+            "PRIVATEKEYPRESENT": ["opaque", 1],
+            "secretcount": ["2", True],
             "secrets_audit_status": ["dirty", "clean ", "CLEAN", "Clean", "", ["clean"], {"clean": True}, 1],
         }
         for key, values in rejected.items():

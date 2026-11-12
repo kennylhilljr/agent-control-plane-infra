@@ -40,13 +40,14 @@ REASON_CREDENTIAL_NAME = "member name looks like a credential"
 # The PEM marker is assembled from pieces so this file does not itself look
 # like a private key block to secret scanners.
 _PEM_DASHES = "-" * 5
-# Prefixes are matched anywhere in a string, including inside a longer word
-# ("reportsk-..."), so an embedded key is never missed or printed. The cost is
-# that prose such as "task-list" is reported too; review such a finding by
-# its pointer rather than weakening the pattern.
+# Value prefixes stay precise: a prefix must start at a token boundary (the
+# start of the string or a non-alphanumeric character) and be followed by at
+# least 20 key characters. Embedded keys such as "key=sk-..." or "(ghp_...)"
+# are found, while prose such as "task-list" or "ask-for-help" is not.
+_KEY_BODY_MIN = 20
 CREDENTIAL_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"sk-[A-Za-z0-9_-]+"),
-    re.compile(r"ghp_[A-Za-z0-9_-]+"),
+    re.compile(r"(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{%d,}" % _KEY_BODY_MIN),
+    re.compile(r"(?<![A-Za-z0-9])ghp_[A-Za-z0-9_-]{%d,}" % _KEY_BODY_MIN),
     re.compile(
         _PEM_DASHES
         + r"BEGIN (?:(?:RSA|EC|DSA|ENCRYPTED|OPENSSH) )?PRIVATE KEY"
@@ -62,8 +63,20 @@ def looks_like_credential(text: str) -> bool:
     return any(pattern.search(text) for pattern in CREDENTIAL_PATTERNS)
 
 
+# Display masking stays greedy: a file name, directory name or pointer
+# component that contains a prefix anywhere is shown as <redacted>, so a key
+# glued to other text ("dirsk-...") is never printed even though it is not
+# reported as a finding on its own.
+_MASK_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"sk-[A-Za-z0-9_-]+"),
+    re.compile(r"ghp_[A-Za-z0-9_-]+"),
+)
+
+
 def mask_component(component: str) -> str:
-    return REDACTED if looks_like_credential(component) else component
+    if looks_like_credential(component) or any(pattern.search(component) for pattern in _MASK_PATTERNS):
+        return REDACTED
+    return component
 
 
 def _escape(component: str) -> str:

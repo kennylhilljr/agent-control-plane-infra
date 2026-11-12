@@ -15,24 +15,28 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 REDACTED = "<redacted>"
 
-# A key is split into lowercase words on any non-alphanumeric separator and on
-# camelCase boundaries ("clientSecret" -> ["client", "secret"]).
-_KEY_SEPARATOR = re.compile(r"[^A-Za-z0-9]+")
-_KEY_WORD = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|[0-9]+")
-
-# A single word is sensitive when it is, or ends with, one of these roots,
-# optionally plural. The suffix form covers compact spellings such as
-# "accesstoken" or "openaiapikey"; unrelated words such as "tokenizer" or
-# "monkey" do not end with a root and stay visible.
-_SENSITIVE_WORD = re.compile(
-    r"^[a-z0-9]*(?:"
-    r"apikeys?|privatekeys?|tokens?|secrets?|passwords?|passphrases?"
-    r"|cookies?|bearers?|credential|authorization"
-    r")$"
+# Key names fail closed: a key is normalized by lowercasing it and removing
+# "_", "-" and ".", and is sensitive when any of these tokens appears anywhere
+# in the result. Compact or oddly cased names such as "PRIVATEKEYPRESENT" or
+# "x-Auth.Token" therefore match. Words that merely contain a token, such as
+# "tokenizer" or "secretary", are redacted too; that is the accepted cost.
+_KEY_STRIP = re.compile(r"[_.\-]")
+SENSITIVE_KEY_TOKENS: tuple[str, ...] = (
+    "apikey",
+    "privatekey",
+    "token",
+    "secret",
+    "password",
+    "passphrase",
+    "cookie",
+    "bearer",
+    "credential",
+    "authorization",
 )
 
-# Two adjacent words that together name a secret ("api_key", "privateKey").
-_SENSITIVE_PAIRS = frozenset({("api", "key"), ("api", "keys"), ("private", "key"), ("private", "keys")})
+# Splits used only to find a metadata suffix: separators, then camelCase words.
+_KEY_SEPARATOR = re.compile(r"[^A-Za-z0-9]+")
+_KEY_WORD = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|[0-9]+")
 
 # Suffix words that mark a sensitive key as metadata about a secret rather
 # than the secret itself. Numeric suffixes keep int/float values only; status
@@ -48,6 +52,18 @@ AUDIT_STATUS_ALLOWLIST: dict[str, frozenset[str]] = {
 }
 
 
+def normalize_key(key: str) -> str:
+    return _KEY_STRIP.sub("", key.lower())
+
+
+def _has_sensitive_token(normalized: str) -> bool:
+    return any(token in normalized for token in SENSITIVE_KEY_TOKENS)
+
+
+def is_sensitive_key(key: str) -> bool:
+    return _has_sensitive_token(normalize_key(key))
+
+
 def _key_segments(key: str) -> list[str]:
     return [segment.lower() for segment in _KEY_SEPARATOR.split(key) if segment]
 
@@ -56,24 +72,20 @@ def _key_words(key: str) -> list[str]:
     return [word.lower() for word in _KEY_WORD.findall(key)]
 
 
-def is_sensitive_key(key: str) -> bool:
-    # Check both the camelCase split and the plain lowercased separator split,
-    # so oddly cased keys such as "PaSsWoRd" or "pRiVaTe_KeY", which the
-    # camelCase split breaks apart, still match case-insensitively.
-    for words in (_key_words(key), _key_segments(key)):
-        if any(_SENSITIVE_WORD.match(word) for word in words):
-            return True
-        if any(pair in _SENSITIVE_PAIRS for pair in zip(words, words[1:])):
-            return True
-    return False
-
-
 def _metadata_suffix(key: str) -> str:
     segments = _key_segments(key)
     if len(segments) > 1:
         return segments[-1]
     words = _key_words(key)
-    return words[-1] if len(words) > 1 else ""
+    if len(words) > 1:
+        return words[-1]
+    # Compact names ("PRIVATEKEYPRESENT", "secretcount") carry the suffix
+    # inline. It only counts when what precedes it still names a secret.
+    normalized = normalize_key(key)
+    for suffix in _NUMERIC_METADATA_SUFFIXES | _STATUS_METADATA_SUFFIXES:
+        if normalized.endswith(suffix) and _has_sensitive_token(normalized[: -len(suffix)]):
+            return suffix
+    return ""
 
 
 def _keep_sensitive_value(key: str, value: Any) -> bool:
