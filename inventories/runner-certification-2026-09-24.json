@@ -514,7 +514,7 @@
       ]
     }
   },
-  "credentials": {
+  "provider_env_check": {
     "method": "environment variable names only, login shell and launchctl; no values read",
     "checked": [
       "GEMINI_API_KEY",
