@@ -24,7 +24,7 @@ python3 --version
 
 ## Tests and checks
 
-`scripts/check.sh` is the single check command. Run it from any directory before opening a PR:
+`scripts/check.sh` is the single check command. Run it before opening a PR; it changes to the repository root itself, so it works from any directory when given its path:
 
 ```bash
 sh scripts/check.sh
@@ -76,12 +76,12 @@ This standalone checker, with its diagnostic array instead of the result envelop
 Review bots read this file on every PR and treat a broken rule as a defect. Each rule below is true of the code on `main`; a change that breaks one must fix the code or update the rule in the same PR.
 
 - Subprocesses in `src/agent_platform/` run through `run_command` in `inventory.py`, with an argument tuple and a timeout (5 seconds by default). Never build shell command strings or pass `shell=True`. Tests may call `subprocess.run` directly with an argument list or tuple; give every new call a timeout.
-- Collectors take their dependencies as arguments: `InventoryCollector` takes `locate`, `run` and `home`, and tests pass fakes for them instead of searching the real `PATH` or running real tools.
+- Collectors take their dependencies as arguments: `InventoryCollector` takes `locate`, `run` and `home` (plus `repositories`), and tests pass fakes for them instead of searching the real `PATH` or running real tools. Provider detection reads `os.environ` directly and records only `credential_configured` booleans.
 - Tests work in `tempfile` folders and never touch the real home folder, the real `~/.openclaw` or the network. A test that needs a home folder or a `TMPDIR` points `HOME` or `TMPDIR` at a temporary folder. Tests never write to `inventories/latest.json`; they may only read the committed evidence under `inventories/`, as the redaction stability and validator tests do.
 - Inventory output passes through `redact`. A new collector returns the smallest useful metadata, and every new inventory field has a redaction test.
-- With `--json`, every CLI result, success or failure, is built by `build_envelope` in `cli.py` and carries the envelope keys from `MIGRATION_SPEC.md` section 7: `ok`, `operation`, `changed`, `checks`, `warnings`, `required_user_actions` and `rollback_checkpoint`. Extra keys such as `archive`, `manifest`, `output` or `error` are added beside them. `backup` prints the envelope even without `--json`, and `inventory` without `--json` prints the inventory itself. An `OSError`, `ValueError` or `SourceChangedDuringBackup` exits 1 with a one-line message from `safe_error_message` and no traceback or file contents: in the envelope's `error` key with `--json`, on stderr without it.
+- With `--json`, every result of a completed `inventory` or `backup` run and every handled failure is built by `build_envelope` in `cli.py` and carries the envelope keys from `MIGRATION_SPEC.md` section 7: `ok`, `operation`, `changed`, `checks`, `warnings`, `required_user_actions` and `rollback_checkpoint`. Extra keys such as `archive`, `manifest`, `output` or `error` are added beside them. `backup` prints the envelope even without `--json`, and `inventory` without `--json` prints the inventory itself. The handled failures are `OSError`, `ValueError` and `SourceChangedDuringBackup`: each exits 1 with a one-line message from `safe_error_message` and no traceback or file contents: in the envelope's `error` key with `--json`, on stderr without it. Other exceptions propagate as a traceback on purpose (`test_unexpected_exceptions_propagate`), and argparse usage errors exit 2 with argparse's own text.
 - Backups do not follow symlinks during traversal. The supplied source root itself is resolved first; inside it, a symlink is recorded in the manifest's `symlinks` map with its target and left out of the archive, and symlinked folders are not entered. The top-level `logs/` and `tmp/` folders are skipped, and a backup folder that overlaps the source is refused.
-- `verify_archive` rejects absolute member names, names with a `..` part, and symlink, hard link and device members before it extracts anything, then restores into a new folder beside the archive (or under `restore_root` when given), compares checksums and removes that folder, pass or fail.
+- `verify_archive` rejects absolute member names, names with a `..` part, and symlink, hard link and device members before it extracts anything, then restores into a new folder beside the archive (or under `restore_root` when given), removes that folder (best effort when verification fails) and compares checksums.
 - JSON is written with `indent=2` and `sort_keys=True`: inventory files, backup manifests, CLI envelopes and the `scripts/check_inventories.py` findings.
 
 ## Safety rules

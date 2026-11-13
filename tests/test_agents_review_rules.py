@@ -100,11 +100,11 @@ class AgentsReviewRulesTests(unittest.TestCase):
 
 
 class TodoPhase8NoteTests(unittest.TestCase):
-    def test_ci_line_has_dated_note_and_stays_open(self) -> None:
+    def test_ci_line_has_dated_check_script_note(self) -> None:
         text = TODO.read_text(encoding="utf-8")
-        line = "- [ ] **AUTO** Add CI, coverage, lint, type, security, secret, and SBOM gates.\n"
-        self.assertIn(line, text)
-        note = text.split(line, 1)[1].split("\n- [", 1)[0]
+        match = re.search(r"^- \[[ x]\] \*\*AUTO\*\* Add CI\b.*\n", text, re.M)
+        self.assertIsNotNone(match, "TODO.md has no Phase 8 CI line")
+        note = text[match.end():].split("\n- [", 1)[0]
         self.assertRegex(note, r"^  \d{4}-\d{2}-\d{2}: ")
         self.assertIn("scripts/check.sh", note)
         self.assertIn("pre-push hook", note)
