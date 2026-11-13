@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
+import stat
 import tarfile
 import tempfile
 from dataclasses import dataclass
@@ -117,23 +119,36 @@ class BackupManager:
                 raise _source_changed(added_or_removed[0])
         archive_path.chmod(0o600)
         self.verify_archive(archive_path, expected)
+        archive_sha256 = _sha256(archive_path)
+        checksum_path = archive_path.with_name(archive_path.name + ".sha256")
+        _write_private(checksum_path, f"{archive_sha256}  {archive_path.name}\n")
+        file_metadata = {
+            str(PurePosixPath(*path.relative_to(self.source).parts)): {
+                "size": post_hash_stats[path][0],
+                "mode": f"{stat.S_IMODE(post_hash_stats[path][3]):04o}",
+            }
+            for path in files
+        }
         manifest = {
-            "schema_version": "1.0",
+            "schema_version": "1.1",
             "created_at": datetime.now(UTC).isoformat(),
             "source": str(self.source),
             "excluded_top_level": sorted(self.EXCLUDED_TOP_LEVEL),
             "archive": archive_path.name,
-            "archive_sha256": _sha256(archive_path),
+            "archive_sha256": archive_sha256,
+            "checksum_file": checksum_path.name,
             "file_count": len(expected),
             "files": expected,
+            # Per-file size in bytes and permission bits as a 4-digit octal
+            # string, taken from the snapshot that was hashed and archived.
+            "file_metadata": file_metadata,
             # Symbolic links are recorded with their targets, never followed
             # and never archived, so nothing outside the source is copied.
             "symlinks": links,
             "symlink_policy": "recorded-not-followed",
             "restore_verified": True,
         }
-        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
-        manifest_path.chmod(0o600)
+        _write_private(manifest_path, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
         return BackupResult(True, True, len(files), checkpoint, archive_path, manifest_path,
                             len(links))
 
@@ -197,7 +212,14 @@ class BackupManager:
         checkpoint.mkdir(mode=0o700)
 
     @staticmethod
-    def verify_archive(archive_path: Path, expected: dict[str, str]) -> None:
+    def verify_archive(archive_path: Path, expected: dict[str, str], *,
+                       restore_root: Path | None = None) -> None:
+        """Restore the archive into a new 0700 folder under restore_root
+        (default: the archive's folder) and compare checksums. The folder is
+        removed when verification ends, pass or fail; nothing is created
+        under tempfile.gettempdir()."""
+        if restore_root is None:
+            restore_root = archive_path.parent
         with tarfile.open(archive_path, "r:gz") as archive:
             members = archive.getmembers()
             for member in members:
@@ -206,8 +228,9 @@ class BackupManager:
                     raise ValueError(f"Unsafe archive path: {member.name}")
                 if member.issym() or member.islnk() or member.isdev():
                     raise ValueError(f"Unsafe archive member: {member.name}")
-            with tempfile.TemporaryDirectory(prefix="agent-platform-restore-") as directory:
-                restore = Path(directory)
+            # mkdtemp creates the folder with mode 0700.
+            restore = Path(tempfile.mkdtemp(prefix=".restore-check-", dir=restore_root))
+            try:
                 archive.extractall(restore, filter="data")
                 restored_root = restore / "openclaw"
                 actual = {
@@ -215,8 +238,18 @@ class BackupManager:
                     for path in sorted(restored_root.rglob("*"))
                     if path.is_file()
                 }
+            finally:
+                shutil.rmtree(restore)
         if actual != expected:
             raise ValueError("Disposable restore checksums do not match source snapshot")
+
+
+def _write_private(path: Path, text: str) -> None:
+    """Create path with mode 0600 from the start, never wider."""
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+        stream.write(text)
+    path.chmod(0o600)
 
 
 def _stat_snapshot(path: Path) -> tuple[int, int, int, int]:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import errno
+import hashlib
+import inspect
 import json
 import os
 import tarfile
@@ -410,6 +412,129 @@ class BackupTests(unittest.TestCase):
             return mock.patch.object(tarfile.TarFile, "add", autospec=True, side_effect=add)
 
         self._run_race(factory, state)
+
+
+
+class _CheckpointAssertions:
+    """Checks for the in-checkpoint restore, the .sha256 file and the 1.1
+    manifest. Subclasses choose where TMPDIR and HOME point."""
+
+    def _environment(self, root: Path) -> dict[str, str]:
+        raise NotImplementedError
+
+    def _temp_root(self, root: Path) -> Path:
+        raise NotImplementedError
+
+    def setUp(self) -> None:
+        holder = tempfile.TemporaryDirectory(dir="/tmp")
+        self.addCleanup(holder.cleanup)
+        self.root = Path(holder.name).resolve()
+        self.watched = self._temp_root(self.root)
+        self.watched.mkdir(parents=True, exist_ok=True)
+        env = mock.patch.dict(os.environ, self._environment(self.root))
+        env.start()
+        self.addCleanup(env.stop)
+        tempdir = mock.patch.object(tempfile, "tempdir", str(self.watched))
+        tempdir.start()
+        self.addCleanup(tempdir.stop)
+        self.source = _make_source(self.root / "state")
+        (self.source / "cron" / "jobs.json").chmod(0o640)
+        (self.source / "openclaw.json").chmod(0o600)
+        self.destination = self.root / "backups"
+
+    def _watched_entries(self) -> list[str]:
+        return sorted(path.name for path in self.watched.iterdir())
+
+    def test_restore_runs_inside_checkpoint_and_is_removed(self) -> None:
+        self.assertEqual(tempfile.gettempdir(), str(self.watched))
+        seen: dict[str, object] = {}
+        real_sha256 = backup._sha256
+
+        def spy(path: Path) -> str:
+            path = Path(path)
+            for parent in path.parents:
+                if parent.name.startswith(".restore-check-"):
+                    seen["restore"] = parent
+                    seen["mode"] = parent.stat().st_mode & 0o777
+            return real_sha256(path)
+
+        with mock.patch.object(backup, "_sha256", side_effect=spy):
+            result = BackupManager(self.source, self.destination).create()
+        self.assertIn("restore", seen, "restore did not run inside the checkpoint")
+        self.assertEqual(Path(seen["restore"]).parent, result.checkpoint_dir)
+        self.assertEqual(seen["mode"], 0o700)
+        self.assertEqual(
+            sorted(path.name for path in result.checkpoint_dir.iterdir()),
+            ["manifest.json", "openclaw-state.tar.gz", "openclaw-state.tar.gz.sha256"],
+        )
+        self.assertEqual(self._watched_entries(), [])
+
+    def test_failed_verification_removes_restore_folder(self) -> None:
+        self.assertIn("restore_root", inspect.signature(BackupManager.verify_archive).parameters)
+        result = BackupManager(self.source, self.destination).create()
+        with self.assertRaisesRegex(ValueError, "checksums do not match"):
+            BackupManager.verify_archive(result.archive, {"openclaw.json": "0" * 64})
+        with self.assertRaises(ValueError):
+            BackupManager.verify_archive(result.archive, {}, restore_root=self.root)
+        leftovers = [path.name for path in result.checkpoint_dir.iterdir()
+                     if path.name.startswith(".restore-check-")]
+        leftovers += [path.name for path in self.root.iterdir()
+                      if path.name.startswith(".restore-check-")]
+        self.assertEqual(leftovers, [])
+        self.assertEqual(self._watched_entries(), [])
+
+    def test_checksum_file_matches_archive(self) -> None:
+        result = BackupManager(self.source, self.destination).create()
+        checksum = result.archive.with_name("openclaw-state.tar.gz.sha256")
+        self.assertTrue(checksum.is_file(), "openclaw-state.tar.gz.sha256 missing")
+        self.assertEqual(checksum.stat().st_mode & 0o777, 0o600)
+        digest = hashlib.sha256(result.archive.read_bytes()).hexdigest()
+        self.assertEqual(checksum.read_text(), f"{digest}  openclaw-state.tar.gz\n")
+        manifest = json.loads(result.manifest.read_text())
+        self.assertEqual(manifest["archive_sha256"], digest)
+        self.assertEqual(manifest["checksum_file"], "openclaw-state.tar.gz.sha256")
+
+    def test_corrupted_archive_fails_verification(self) -> None:
+        result = BackupManager(self.source, self.destination).create()
+        manifest = json.loads(result.manifest.read_text())
+        data = bytearray(result.archive.read_bytes())
+        data[len(data) // 2] ^= 0xFF
+        result.archive.write_bytes(bytes(data))
+        self.assertNotEqual(hashlib.sha256(bytes(data)).hexdigest(),
+                            manifest["archive_sha256"])
+        with self.assertRaises((ValueError, tarfile.TarError, OSError, EOFError)):
+            BackupManager.verify_archive(result.archive, manifest["files"])
+        self.assertEqual(
+            [path.name for path in result.checkpoint_dir.iterdir()
+             if path.name.startswith(".restore-check-")], [])
+
+    def test_manifest_records_size_and_mode(self) -> None:
+        result = BackupManager(self.source, self.destination).create()
+        manifest = json.loads(result.manifest.read_text())
+        self.assertEqual(manifest["schema_version"], "1.1")
+        self.assertEqual(manifest["file_metadata"], {
+            "cron/jobs.json": {"size": len('{"jobs":[]}'), "mode": "0640"},
+            "openclaw.json": {"size": len('{"mode":"test"}'), "mode": "0600"},
+        })
+        self.assertEqual(sorted(manifest["files"]), sorted(manifest["file_metadata"]))
+
+
+class CheckpointWithTmpdirInFakeHomeTests(_CheckpointAssertions, unittest.TestCase):
+    def _temp_root(self, root: Path) -> Path:
+        return root / "home" / ".openclaw" / "tmp"
+
+    def _environment(self, root: Path) -> dict[str, str]:
+        return {"HOME": str(root / "home"), "TMPDIR": str(self._temp_root(root))}
+
+
+class CheckpointWithTmpdirUnderTmpTests(_CheckpointAssertions, unittest.TestCase):
+    """TMPDIR is a fresh folder under /tmp, so it can be watched for leftovers."""
+
+    def _temp_root(self, root: Path) -> Path:
+        return root / "tmp"
+
+    def _environment(self, root: Path) -> dict[str, str]:
+        return {"HOME": str(root / "home"), "TMPDIR": str(self._temp_root(root))}
 
 
 if __name__ == "__main__":
