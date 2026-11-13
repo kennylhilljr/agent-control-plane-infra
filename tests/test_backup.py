@@ -157,6 +157,42 @@ class BackupTests(unittest.TestCase):
             source = _make_source(parent)
             self._assert_overlap_refused(source, parent)
 
+    def test_destination_inside_case_variant_of_source_is_refused(self) -> None:
+        """A destination spelled with different letter case is inside the
+        source on a case-insensitive volume, such as macOS's default APFS."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            (source / "cron").mkdir(parents=True)
+            (source / "openclaw.json").write_text("{}")
+            alias = root / "SRC"
+            if not alias.exists() or not os.path.samefile(alias, source):
+                self.skipTest("temporary folder is on a case-sensitive volume")
+            self._assert_overlap_refused(source, alias / "backups")
+            self.assertFalse((source / "backups").exists())
+            with self.assertRaisesRegex(ValueError, "source"):
+                BackupManager(alias / "cron", source).create(dry_run=True)
+
+    def test_overlap_check_compares_file_identity_not_text(self) -> None:
+        """_paths_overlap matches by st_dev/st_ino, so an unresolved link to
+        the source counts as the source on any volume."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src"
+            (source / "inner").mkdir(parents=True)
+            sibling = root / "other"
+            sibling.mkdir()
+            alias = root / "alias"
+            alias.symlink_to(source, target_is_directory=True)
+
+            self.assertTrue(backup._paths_overlap(source, alias))
+            self.assertTrue(backup._paths_overlap(source, alias / "new" / "deep"))
+            self.assertTrue(backup._paths_overlap(alias / "inner", source))
+            self.assertTrue(backup._paths_overlap(source, alias / "inner"))
+            self.assertFalse(backup._paths_overlap(source, sibling / "backups"))
+            self.assertFalse(backup._paths_overlap(source, root / "missing" / "x"))
+            self.assertFalse(backup._paths_overlap(source / "inner", sibling))
+
     def test_tmp_excluded_from_manifest(self) -> None:
         """test_tmp_excluded_from_manifest: the top-level tmp/ directory is
         left out of the manifest and the archive."""
