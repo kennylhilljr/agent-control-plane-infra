@@ -22,6 +22,8 @@ Legend:
 - [x] **AUTO** Validate backup checksums and disposable restore.
 - [x] **AUTO** Refuse destinations overlapping the source, exclude tmp/, and detect mid-backup source changes.
   Issue #25: the error tells the operator to stop the Gateway and retry.
+- [x] **AUTO** Restore-check inside the checkpoint, write a `.sha256` file, and record file size and mode in the manifest.
+  Issue #26: manifest `schema_version` is `1.1`; nothing is written under the system temp directory.
 - [x] **AUTO** Check committed inventory evidence for leaks and over-redaction.
   `python3 scripts/check_inventories.py` (run by `scripts/check.sh`) passes on
   every committed `inventories/**/*.json`; `redact` now covers private keys,
