@@ -24,7 +24,15 @@ python3 --version
 
 ## Tests and checks
 
-Run from the repository root:
+`scripts/check.sh` is the single check command. Run it before opening a PR; it changes to the repository root itself, so it works from any directory when given its path:
+
+```bash
+sh scripts/check.sh
+```
+
+It stops at the first failing stage: the unit tests, a `sh -n` syntax check of `bin/agent-platform` and `scripts/*.sh` (plus ShellCheck when it is installed), the inventory validator `scripts/check_inventories.py`, and a gitleaks secret scan. The scan fails when gitleaks is not installed unless `ALLOW_NO_GITLEAKS=1` is set. An opt-in pre-push hook runs the same script; enable it in a clone with `git config core.hooksPath githooks`. `docs/ci.md` describes the stages and has a copyable GitHub Actions workflow that calls the same script.
+
+To run only the unit tests, from the repository root:
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -32,7 +40,7 @@ python3 -m unittest discover -s tests -v
 
 Each test module puts the repository `src/` directory on `sys.path` itself, so bare discovery and direct runs such as `python3 tests/test_inventory.py` work without a `PYTHONPATH` prefix (the older `PYTHONPATH=src` form still works). The tests are standard library `unittest` cases, so the command above needs no packages. `tests/test_tmpdirs.py` reruns the full suite in fresh subprocesses with `TMPDIR=/tmp` and with `TMPDIR` under a disposable home's `.openclaw/tmp`, so both temporary-directory setups are covered by the suite itself; it never touches real OpenClaw state. pytest also runs them, using the settings in `pyproject.toml`, once the optional `test` extra is installed (`python3 -m pip install -e ".[test]"`). `__pycache__/` and `*.pyc` are ignored by Git.
 
-No formatter, linter or type checker is configured in `pyproject.toml`. The handoff notes ask for a secret scan before reporting progress:
+No formatter, linter or type checker is configured in `pyproject.toml`. The handoff notes ask for a secret scan before reporting progress; `scripts/check.sh` runs it, and it also runs on its own:
 
 ```bash
 gitleaks dir . --no-banner --redact --exit-code 1
@@ -61,11 +69,20 @@ This standalone checker, with its diagnostic array instead of the result envelop
 
 - Modules start with `from __future__ import annotations` and use type hints.
 - Results are frozen dataclasses (`BackupResult`, `CommandResult`).
-- Subprocesses run through `run_command` with argument tuples and a timeout. Never build shell command strings.
-- `InventoryCollector` takes `locate`, `run` and `home` arguments so tests can use fakes. Tests must not touch the real home directory, real OpenClaw state or the network; use `tempfile` directories and fake runners as the existing tests do.
-- Inventory output passes through `redact`. A new collector must return the smallest useful metadata and come with a redaction test.
-- JSON is written with `indent=2` and `sort_keys=True`.
 - Add regression tests for new inventory fields, redaction cases, archive validation and filesystem behavior.
+
+## Review rules
+
+Review bots read this file on every PR and treat a broken rule as a defect. Each rule below is true of the code on `main`; a change that breaks one must fix the code or update the rule in the same PR.
+
+- Subprocesses in `src/agent_platform/` run through `run_command` in `inventory.py`, with an argument tuple and a timeout (5 seconds by default). Never build shell command strings or pass `shell=True`. Tests may call `subprocess.run` directly with an argument list or tuple; give every new call a timeout.
+- Collectors take their dependencies as arguments: `InventoryCollector` takes `locate`, `run` and `home` (plus `repositories`), and tests pass fakes for them instead of searching the real `PATH` or running real tools. Provider detection reads `os.environ` directly and records only `credential_configured` booleans.
+- Tests work in `tempfile` folders and never touch the real home folder, the real `~/.openclaw` or the network. A test that needs a home folder or a `TMPDIR` points `HOME` or `TMPDIR` at a temporary folder. Tests never write to `inventories/latest.json`; they may only read the committed evidence under `inventories/`, as the redaction stability and validator tests do.
+- Inventory output passes through `redact`. A new collector returns the smallest useful metadata, and every new inventory field has a redaction test.
+- With `--json`, every result of a completed `inventory` or `backup` run and every handled failure is built by `build_envelope` in `cli.py` and carries the envelope keys from `MIGRATION_SPEC.md` section 7: `ok`, `operation`, `changed`, `checks`, `warnings`, `required_user_actions` and `rollback_checkpoint`. Extra keys such as `archive`, `manifest`, `output` or `error` are added beside them. `backup` prints the envelope even without `--json`, and `inventory` without `--json` prints the inventory itself. The handled failures are `OSError`, `ValueError` and `SourceChangedDuringBackup`: each exits 1 with a one-line message from `safe_error_message` and no traceback or file contents, put in the envelope's `error` key with `--json` and on stderr without it. Other exceptions propagate as a traceback on purpose (`test_unexpected_exceptions_propagate`), and argparse usage errors exit 2 with argparse's own text.
+- Backups do not follow symlinks during traversal. The supplied source root itself is resolved first; inside it, a symlink is recorded in the manifest's `symlinks` map with its target and left out of the archive, and symlinked folders are not entered. The top-level `logs/` and `tmp/` folders are skipped, and a backup folder that overlaps the source is refused.
+- `verify_archive` rejects absolute member names, names with a `..` part, and symlink, hard link and device members before it extracts anything, then restores into a new folder beside the archive (or under `restore_root` when given), removes that folder after extraction and hashing (best effort when either raises) and then compares checksums.
+- JSON is written with `indent=2` and `sort_keys=True`: inventory files, backup manifests, CLI envelopes and the `scripts/check_inventories.py` findings.
 
 ## Safety rules
 
