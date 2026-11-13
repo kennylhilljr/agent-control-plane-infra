@@ -414,7 +414,6 @@ class BackupTests(unittest.TestCase):
         self._run_race(factory, state)
 
 
-
 class _CheckpointAssertions:
     """Checks for the in-checkpoint restore, the .sha256 file and the 1.1
     manifest. Subclasses choose where TMPDIR and HOME point."""

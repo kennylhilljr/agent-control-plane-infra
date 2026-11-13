@@ -238,8 +238,11 @@ class BackupManager:
                     for path in sorted(restored_root.rglob("*"))
                     if path.is_file()
                 }
-            finally:
-                shutil.rmtree(restore)
+            except BaseException:
+                # Keep the error that explains the failure; cleanup is best effort.
+                shutil.rmtree(restore, ignore_errors=True)
+                raise
+            shutil.rmtree(restore)
         if actual != expected:
             raise ValueError("Disposable restore checksums do not match source snapshot")
 
@@ -253,8 +256,8 @@ def _write_private(path: Path, text: str) -> None:
 
 
 def _stat_snapshot(path: Path) -> tuple[int, int, int, int]:
-    stat = os.lstat(path)
-    return (stat.st_size, stat.st_mtime_ns, stat.st_ino, stat.st_mode)
+    result = os.lstat(path)
+    return (result.st_size, result.st_mtime_ns, result.st_ino, result.st_mode)
 
 
 def _relative_posix(source: Path, path: Path) -> str:
