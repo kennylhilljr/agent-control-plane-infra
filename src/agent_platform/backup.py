@@ -28,6 +28,36 @@ class SourceChangedDuringBackup(RuntimeError):
     pass
 
 
+def _identity(path: Path) -> tuple[int, int] | None:
+    """Return (st_dev, st_ino) for an existing path, following links, or None."""
+    try:
+        info = os.stat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        return None
+    return info.st_dev, info.st_ino
+
+
+def _contains_by_identity(outer: Path, inner: Path) -> bool:
+    """True when ``inner`` or one of its existing ancestors is ``outer`` itself.
+
+    Compares file identity, not path text, so a case-variant spelling on a
+    case-insensitive volume, or a link to the same folder, still matches.
+    """
+    outer_id = _identity(outer)
+    if outer_id is None:
+        return False
+    for candidate in (inner, *inner.parents):
+        if _identity(candidate) == outer_id:
+            return True
+    return False
+
+
+def _paths_overlap(source: Path, destination: Path) -> bool:
+    """True when the two folders are the same or one lies inside the other."""
+    return (_contains_by_identity(source, destination)
+            or _contains_by_identity(destination, source))
+
+
 class BackupManager:
     EXCLUDED_TOP_LEVEL = {"logs", "tmp"}
 
@@ -38,11 +68,7 @@ class BackupManager:
     def create(self, *, dry_run: bool = False) -> BackupResult:
         if not self.source.is_dir():
             raise FileNotFoundError(f"OpenClaw state directory not found: {self.source}")
-        if (
-            self.destination == self.source
-            or self.destination.is_relative_to(self.source)
-            or self.source.is_relative_to(self.destination)
-        ):
+        if _paths_overlap(self.source, self.destination):
             raise ValueError(
                 f"Backup destination must not overlap the source: "
                 f"source={self.source} destination={self.destination}"
