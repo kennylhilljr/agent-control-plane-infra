@@ -214,7 +214,7 @@ class BackupCliTests(CliTestCase):
                     {"name": "symlinks-recorded-not-followed", "status": "passed", "count": 1},
                     {"name": "disposable-restore", "status": "passed"},
                 ],
-                "warnings": ["Live logs are intentionally excluded from rollback state."],
+                "warnings": ["Live logs and the tmp/ scratch directory are intentionally excluded from rollback state."],
                 "required_user_actions": [],
                 "rollback_checkpoint": str(result.checkpoint_dir),
                 "archive": str(result.archive),
@@ -235,6 +235,36 @@ class BackupCliTests(CliTestCase):
             with mock.patch.object(cli, "BackupManager", manager):
                 with self.assertRaises(RuntimeError):
                     run_cli(["backup", "--backup-dir", str(root / "backups"), "--json"])
+
+    def test_overlapping_destination_returns_envelope(self) -> None:
+        with fixture_root() as root:
+            source = make_source(root)
+            envelope = self.assert_json_failure(
+                run_cli(["backup", "--source", str(source), "--backup-dir",
+                         str(source / "backups"), "--dry-run", "--json"]),
+                "backup", changed=False,
+            )
+            self.assertIn("must not overlap the source", envelope["error"])
+            self.assertIn(str(source), envelope["error"])
+            self.assertFalse((source / "backups").exists())
+
+    def test_source_change_returns_envelope(self) -> None:
+        with fixture_root() as root:
+            source = make_source(root)
+            destination = root / "backups"
+
+            def hook(manager: BackupManager) -> None:
+                (source / "cron" / "new.json").write_text("{}")
+
+            with mock.patch.object(BackupManager, "_after_enumeration", autospec=True,
+                                   side_effect=hook):
+                envelope = self.assert_json_failure(
+                    run_cli(["backup", "--source", str(source), "--backup-dir",
+                             str(destination), "--json"]),
+                    "backup", changed=True,
+                )
+            self.assertIn("cron/new.json", envelope["error"])
+            self.assertIn("Stop the Gateway and retry.", envelope["error"])
 
     def _checksum_failure(self, root: Path, destination: Path) -> dict[str, Any]:
         source = make_source(root)

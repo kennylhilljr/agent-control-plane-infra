@@ -22,8 +22,12 @@ class BackupResult:
     link_count: int = 0
 
 
+class SourceChangedDuringBackup(RuntimeError):
+    pass
+
+
 class BackupManager:
-    EXCLUDED_TOP_LEVEL = {"logs"}
+    EXCLUDED_TOP_LEVEL = {"logs", "tmp"}
 
     def __init__(self, source: Path, destination: Path) -> None:
         self.source = source.expanduser().resolve()
@@ -32,7 +36,16 @@ class BackupManager:
     def create(self, *, dry_run: bool = False) -> BackupResult:
         if not self.source.is_dir():
             raise FileNotFoundError(f"OpenClaw state directory not found: {self.source}")
-        files, links = self._source_entries()
+        if (
+            self.destination == self.source
+            or self.destination.is_relative_to(self.source)
+            or self.source.is_relative_to(self.destination)
+        ):
+            raise ValueError(
+                f"Backup destination must not overlap the source: "
+                f"source={self.source} destination={self.destination}"
+            )
+        files, enum_stats, links = self._source_entries()
         checkpoint_name = datetime.now(UTC).strftime("openclaw-%Y%m%dT%H%M%S.%fZ")
         checkpoint = self.destination / checkpoint_name
         archive_path = checkpoint / "openclaw-state.tar.gz"
@@ -42,11 +55,66 @@ class BackupManager:
                                 len(links))
 
         self._prepare_destination(checkpoint)
-        expected = {str(path.relative_to(self.source)): _sha256(path) for path in files}
+        expected: dict[str, str] = {}
+        post_hash_stats: dict[Path, tuple[int, int, int, int]] = {}
+        for path in files:
+            relative_posix = str(PurePosixPath(*path.relative_to(self.source).parts))
+            pre_hash_snap = _checked_snapshot(path, relative_posix)
+            if pre_hash_snap != enum_stats[path]:
+                raise _source_changed(relative_posix)
+            try:
+                digest = _sha256(path)
+            except FileNotFoundError as error:
+                raise _source_changed(relative_posix) from error
+            except OSError as error:
+                # An unreadable but unchanged file (EACCES, EIO, EMFILE) keeps
+                # its own error: stopping the Gateway would not fix it.
+                if _checked_snapshot(path, relative_posix) != pre_hash_snap:
+                    raise _source_changed(relative_posix) from error
+                raise
+            post_hash_snap = _checked_snapshot(path, relative_posix)
+            if post_hash_snap != pre_hash_snap:
+                raise _source_changed(relative_posix)
+            post_hash_stats[path] = post_hash_snap
+            expected[relative_posix] = digest
         with tarfile.open(archive_path, "w:gz") as archive:
+            self._after_archive_opened(archive)
             for path in files:
                 relative = path.relative_to(self.source)
-                archive.add(path, arcname=str(PurePosixPath("openclaw", *relative.parts)), recursive=False)
+                relative_posix = str(PurePosixPath(*relative.parts))
+                pre_add_snap = _checked_snapshot(path, relative_posix)
+                if pre_add_snap != post_hash_stats[path]:
+                    raise _source_changed(relative_posix)
+                try:
+                    archive.add(path, arcname=str(PurePosixPath("openclaw", *relative.parts)),
+                                recursive=False)
+                except OSError as error:
+                    # The error may come from writing the archive (a full
+                    # disk, say), so only blame the source if it changed.
+                    if _checked_snapshot(path, relative_posix) != pre_add_snap:
+                        raise _source_changed(relative_posix) from error
+                    raise
+                self._after_tarfile_add(path, PurePosixPath(*relative.parts))
+                post_add_snap = _checked_snapshot(path, relative_posix)
+                if post_add_snap != pre_add_snap:
+                    raise _source_changed(relative_posix)
+            # A file that passed its own post-add check can still be rewritten
+            # while later files are archived, so check every file once more.
+            for path in files:
+                relative_posix = str(PurePosixPath(*path.relative_to(self.source).parts))
+                if _checked_snapshot(path, relative_posix) != post_hash_stats[path]:
+                    raise _source_changed(relative_posix)
+            # A file or link created or removed after enumeration would be
+            # missing from (or stale in) the checkpoint, so walk the tree again.
+            now_files, now_links = self._scan()
+            added_or_removed = sorted(
+                {_relative_posix(self.source, path) for path in set(now_files) ^ set(files)}
+                | {name for name in set(now_links) ^ set(links)}
+                | {name for name in set(now_links) & set(links)
+                   if now_links[name] != links[name]}
+            )
+            if added_or_removed:
+                raise _source_changed(added_or_removed[0])
         archive_path.chmod(0o600)
         self.verify_archive(archive_path, expected)
         manifest = {
@@ -72,22 +140,49 @@ class BackupManager:
     def _source_files(self) -> list[Path]:
         return self._source_entries()[0]
 
-    def _source_entries(self) -> tuple[list[Path], dict[str, str]]:
-        """Regular files to archive, and symbolic links (relative path to
-        target) to record. Links are never followed: rglob does not descend
-        into symlinked directories, and a link's target is read, not opened."""
+    def _source_entries(
+        self,
+    ) -> tuple[list[Path], dict[Path, tuple[int, int, int, int]], dict[str, str]]:
+        """Regular files to archive with their enumeration-time lstat
+        snapshots, and symbolic links (relative path to target) to record.
+        Links are never followed: rglob does not descend into symlinked
+        directories, and a link's target is read, not opened."""
+        files, links = self._scan()
+        enum_stats = {
+            path: _checked_snapshot(path, _relative_posix(self.source, path)) for path in files
+        }
+        self._after_enumeration()
+        return files, enum_stats, links
+
+    def _scan(self) -> tuple[list[Path], dict[str, str]]:
+        """Walk the source once: sorted regular files and sorted links."""
         files: list[Path] = []
         links: dict[str, str] = {}
         for path in self.source.rglob("*"):
             relative = path.relative_to(self.source)
             if relative.parts and relative.parts[0] in self.EXCLUDED_TOP_LEVEL:
                 continue
-            if path.is_symlink():
-                links[str(PurePosixPath(*relative.parts))] = os.readlink(path)
-                continue
+            relative_posix = str(PurePosixPath(*relative.parts))
+            try:
+                if path.is_symlink():
+                    links[relative_posix] = os.readlink(path)
+                    continue
+            except FileNotFoundError as error:
+                raise _source_changed(relative_posix) from error
             if path.is_file():
                 files.append(path)
         return sorted(files), dict(sorted(links.items()))
+
+    # Phase hooks. They do nothing in production; tests patch them to change
+    # the source tree between backup phases.
+    def _after_enumeration(self) -> None:
+        pass
+
+    def _after_archive_opened(self, archive: tarfile.TarFile) -> None:
+        pass
+
+    def _after_tarfile_add(self, path: Path, relative: PurePosixPath) -> None:
+        pass
 
     def _prepare_destination(self, checkpoint: Path) -> None:
         if self.destination.exists():
@@ -122,6 +217,28 @@ class BackupManager:
                 }
         if actual != expected:
             raise ValueError("Disposable restore checksums do not match source snapshot")
+
+
+def _stat_snapshot(path: Path) -> tuple[int, int, int, int]:
+    stat = os.lstat(path)
+    return (stat.st_size, stat.st_mtime_ns, stat.st_ino, stat.st_mode)
+
+
+def _relative_posix(source: Path, path: Path) -> str:
+    return str(PurePosixPath(*path.relative_to(source).parts))
+
+
+def _source_changed(relative_posix: str) -> SourceChangedDuringBackup:
+    return SourceChangedDuringBackup(
+        f"Source file changed during backup: {relative_posix}. Stop the Gateway and retry."
+    )
+
+
+def _checked_snapshot(path: Path, relative_posix: str) -> tuple[int, int, int, int]:
+    try:
+        return _stat_snapshot(path)
+    except OSError as error:
+        raise _source_changed(relative_posix) from error
 
 
 def _sha256(path: Path) -> str:

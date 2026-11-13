@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
-from .backup import BackupManager
+from .backup import BackupManager, SourceChangedDuringBackup
 from .inventory import InventoryCollector
 
 
@@ -25,6 +25,7 @@ DEFAULT_INVENTORY_OUTPUT = Path("inventories/latest.json")
 # archive member names. Any other ValueError (decoding, conversion, JSON
 # parsing) can quote input data, so its text is never shown.
 KNOWN_VALUE_ERROR_PREFIXES = (
+    "Backup destination must not overlap the source: ",
     "Disposable restore checksums do not match source snapshot",
     "Unsafe archive path: ",
     "Unsafe archive member: ",
@@ -89,6 +90,9 @@ def safe_error_message(error: BaseException) -> str:
     Only fixed text is shown: the package's own messages, the operating
     system's description of an errno and the file names the error carries.
     Free-form exception text is withheld because it can quote input data."""
+    if isinstance(error, SourceChangedDuringBackup):
+        # Fixed text plus a relative path inside the source; no contents.
+        return _one_line(str(error))
     if isinstance(error, ValueError):
         text = str(error)
         if text.startswith(KNOWN_VALUE_ERROR_PREFIXES):
@@ -251,7 +255,7 @@ def _run_backup(args: argparse.Namespace) -> int:
                 "status": "passed" if result.verified else "not-run",
             },
         ],
-        warnings=["Live logs are intentionally excluded from rollback state."],
+        warnings=["Live logs and the tmp/ scratch directory are intentionally excluded from rollback state."],
         rollback_checkpoint=str(result.checkpoint_dir),
         archive=str(result.archive),
         manifest=str(result.manifest),
@@ -272,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return run(args)
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, SourceChangedDuringBackup) as error:
         message = safe_error_message(error)
         changed, warnings = tracker.changes()
     if args.json:
