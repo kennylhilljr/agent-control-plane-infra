@@ -68,12 +68,7 @@ class BackupManager:
     def create(self, *, dry_run: bool = False) -> BackupResult:
         if not self.source.is_dir():
             raise FileNotFoundError(f"OpenClaw state directory not found: {self.source}")
-        if (
-            self.destination == self.source
-            or self.destination.is_relative_to(self.source)
-            or self.source.is_relative_to(self.destination)
-            or _paths_overlap(self.source, self.destination)
-        ):
+        if _paths_overlap(self.source, self.destination):
             raise ValueError(
                 f"Backup destination must not overlap the source: "
                 f"source={self.source} destination={self.destination}"
