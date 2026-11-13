@@ -247,6 +247,11 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
 ## Phase 8 — Production readiness
 
 - [ ] **AUTO** Add CI, coverage, lint, type, security, secret, and SBOM gates.
+  2026-11-12: the local check script `scripts/check.sh` (unit tests, shell
+  syntax, inventory validator, gitleaks) and the opt-in pre-push hook in
+  `githooks/` landed, and `AGENTS.md` names the script as the single check
+  command. Still open: the workflow file under `.github/workflows/`, coverage
+  and SBOM gates.
 - [ ] **AUTO** Publish operator, incident, backup, restore, and upgrade runbooks.
 - [x] **AUTO** Schedule recurring runner doctor and model-catalog refresh.
   2026-10-18: launchd agent `local.openclaw-ecc-orchestrator.recertify` runs
