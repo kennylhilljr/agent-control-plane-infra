@@ -13,7 +13,7 @@ from typing import Any, Iterator
 from unittest import mock
 
 from agent_platform import cli
-from agent_platform.backup import BackupManager, BackupResult
+from agent_platform.backup import CORRUPT_ARCHIVE_MESSAGE, BackupManager, BackupResult
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INVENTORIES = REPO_ROOT / "inventories"
@@ -132,6 +132,12 @@ class CliTestCase(unittest.TestCase):
 
 
 class BackupCliTests(CliTestCase):
+    def test_corrupt_archive_message_is_shown(self) -> None:
+        """test_corrupt_archive_message_is_shown: safe_error_message passes
+        the corrupt compressed stream message through unchanged."""
+        self.assertEqual(cli.safe_error_message(ValueError(CORRUPT_ARCHIVE_MESSAGE)),
+                         CORRUPT_ARCHIVE_MESSAGE)
+
     def test_dry_run_json_success_has_all_envelope_keys(self) -> None:
         with fixture_root() as root:
             source = make_source(root)

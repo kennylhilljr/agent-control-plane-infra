@@ -34,6 +34,7 @@ KNOWN_VALUE_ERROR_PREFIXES = (
     "age encryption failed: ",
     "Encryption staging folder must not overlap ",
     "Encryption staging folder must not look synchronized: ",
+    "Archive compressed stream is corrupt",
 )
 # OSError messages raised by this package with a path and fixed text.
 KNOWN_OS_ERROR_PREFIXES = (

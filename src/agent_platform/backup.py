@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import os
@@ -8,6 +9,7 @@ import shutil
 import stat
 import tarfile
 import tempfile
+import zlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -35,6 +37,10 @@ _AGE_RECIPIENT = re.compile(
 _SYNCED_PART_PREFIXES = ("dropbox", "onedrive", "google drive", "googledrive", "icloud",
                          "box sync", "pcloud", "nextcloud", "owncloud", "syncthing")
 _SYNCED_PARTS = {"mobile documents", "cloudstorage", "my drive", "box"}
+
+CORRUPT_ARCHIVE_MESSAGE = (
+    "Archive compressed stream is corrupt: gzip CRC, length or deflate data check failed"
+)
 
 
 @dataclass(frozen=True)
@@ -413,12 +419,15 @@ class BackupManager:
     @staticmethod
     def verify_archive(archive_path: Path, expected: dict[str, str], *,
                        restore_root: Path | None = None) -> None:
-        """Restore the archive into a new 0700 folder under restore_root
-        (default: the archive's folder) and compare checksums. The folder is
-        removed when verification ends, pass or fail; nothing is created
-        under tempfile.gettempdir()."""
+        """First decompress the whole gzip stream so the gzip CRC and length
+        are checked, raising ValueError when that fails. Then restore the
+        archive into a new 0700 folder under restore_root (default: the
+        archive's folder) and compare checksums. The folder is removed when
+        verification ends, pass or fail; nothing is created under
+        tempfile.gettempdir()."""
         if restore_root is None:
             restore_root = archive_path.parent
+        _check_gzip_stream(archive_path)
         with tarfile.open(archive_path, "r:gz") as archive:
             members = archive.getmembers()
             for member in members:
@@ -490,4 +499,16 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _check_gzip_stream(path: Path) -> None:
+    """Decompress the whole gzip stream so its CRC32 and length trailer are
+    checked. tarfile stops at the tar end-of-archive marker and can leave the
+    tail of the stream unread."""
+    with gzip.open(path, "rb") as stream:
+        try:
+            while stream.read(1024 * 1024):
+                pass
+        except (gzip.BadGzipFile, EOFError, zlib.error) as error:
+            raise ValueError(CORRUPT_ARCHIVE_MESSAGE) from error
 

@@ -530,6 +530,9 @@ class _CheckpointAssertions:
         self.assertEqual(manifest["checksum_file"], "openclaw-state.tar.gz.sha256")
 
     def test_corrupted_archive_fails_verification(self) -> None:
+        """test_corrupted_archive_fails_verification: a flipped byte in the
+        middle of the archive raises the corrupt compressed stream ValueError
+        and leaves no restore folder behind."""
         result = BackupManager(self.source, self.destination).create()
         manifest = json.loads(result.manifest.read_text())
         data = bytearray(result.archive.read_bytes())
@@ -537,11 +540,37 @@ class _CheckpointAssertions:
         result.archive.write_bytes(bytes(data))
         self.assertNotEqual(hashlib.sha256(bytes(data)).hexdigest(),
                             manifest["archive_sha256"])
-        with self.assertRaises((ValueError, tarfile.TarError, OSError, EOFError)):
+        with self.assertRaisesRegex(ValueError, "Archive compressed stream is corrupt"):
             BackupManager.verify_archive(result.archive, manifest["files"])
         self.assertEqual(
             [path.name for path in result.checkpoint_dir.iterdir()
              if path.name.startswith(".restore-check-")], [])
+
+    def test_corrupted_gzip_trailer_fails_verification(self) -> None:
+        """test_corrupted_gzip_trailer_fails_verification: a flipped byte in
+        the gzip CRC32 or ISIZE trailer raises the corrupt compressed stream
+        ValueError and leaves no restore folder behind."""
+        # tarfile never reads the gzip trailer on Python 3.11, so this failed before the fix.
+        result = BackupManager(self.source, self.destination).create()
+        manifest = json.loads(result.manifest.read_text())
+        original = result.archive.read_bytes()
+        for offset in (-8, -1):
+            with self.subTest(offset=offset):
+                data = bytearray(original)
+                data[offset] ^= 0xFF
+                result.archive.write_bytes(bytes(data))
+                with self.assertRaisesRegex(ValueError, "Archive compressed stream is corrupt"):
+                    BackupManager.verify_archive(result.archive, manifest["files"])
+        self.assertEqual(
+            [path.name for path in result.checkpoint_dir.iterdir()
+             if path.name.startswith(".restore-check-")], [])
+
+    def test_missing_archive_raises_os_error(self) -> None:
+        """test_missing_archive_raises_os_error: a missing archive still
+        raises FileNotFoundError, not the corrupt stream ValueError."""
+        result = BackupManager(self.source, self.destination).create()
+        with self.assertRaises(FileNotFoundError):
+            BackupManager.verify_archive(result.archive.with_name("missing.tar.gz"), {})
 
     def test_manifest_records_size_and_mode(self) -> None:
         result = BackupManager(self.source, self.destination).create()
