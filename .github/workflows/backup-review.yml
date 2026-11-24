@@ -1,6 +1,7 @@
 # Backup PR review for when the Mac running `prbot watch` is offline.
 #
-# Every 30 minutes this finds open, non-draft PRs whose head commit is at least
+# Every 30 minutes this finds open, non-draft PRs from branches of this
+# repository (fork PRs are skipped) whose head commit is at least
 # STALE_MINUTES old and has no review from prbot ("Reviewed commit `<sha>`") or
 # from this workflow ("Backup review of commit `<sha>`"). Claude reviews each
 # one read-only with the same prompt prbot uses, and the review is posted as
@@ -45,8 +46,8 @@ jobs:
           now=$(date -u +%s)
           picked='[]'
           for row in $(gh pr list -R "$REPO" --state open --limit 100 \
-              --json number,isDraft,headRefOid \
-              --jq '.[] | select(.isDraft | not) | "\(.number):\(.headRefOid)"'); do
+              --json number,isDraft,isCrossRepository,headRefOid \
+              --jq '.[] | select((.isDraft | not) and (.isCrossRepository | not)) | "\(.number):\(.headRefOid)"'); do
             n=${row%%:*}; sha=${row#*:}; short=${sha:0:10}
             when=$(gh api "repos/$REPO/commits/$sha" --jq '.commit.committer.date')
             age=$(( (now - $(date -u -d "$when" +%s)) / 60 ))
@@ -76,6 +77,8 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      # claude-code-action exchanges an OIDC token for the Claude GitHub App
+      # token it returns as outputs.github_token, which posts the review.
       id-token: write
     strategy:
       fail-fast: false
@@ -83,7 +86,7 @@ jobs:
       matrix:
         pr: ${{ fromJSON(needs.find.outputs.prs) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ matrix.pr.sha }}
           fetch-depth: 0
@@ -108,7 +111,7 @@ jobs:
 
       - id: claude
         if: env.SKIP != '1'
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@469588f42e6b1e94cd14ad09dccfeaec772ce0fd # v1.0.280
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
