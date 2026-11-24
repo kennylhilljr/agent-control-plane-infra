@@ -187,7 +187,7 @@ class EncryptedBackupTests(unittest.TestCase):
         with fixture_root() as root:
             source = make_source(root)
             for recipient in ("age1pq1" + "q" * 1950, "age1yubikey1" + "q" * 60,
-                              "age1tag1" + "q" * 60, SSH_RECIPIENT + " with spaces in comment"):
+                              "age1tag1" + "q" * 60, "age1fido2-hmac1" + "q" * 60, SSH_RECIPIENT + " with spaces in comment"):
                 fake = FakeAge()
                 result = manager(root, source, root / "backups", fake,
                                  encrypt_to=(recipient,)).create(dry_run=True)
@@ -198,6 +198,8 @@ class EncryptedBackupTests(unittest.TestCase):
             source = make_source(root)
             for recipient in ("--output=/etc/passwd", "age1short", "AGE-SECRET-KEY-1ABC",
                               "age1Yubikey1" + "q" * 60, "age1yubikey1" + "b" * 60,
+                              "age1" + "n" * 33 + "1" + "q" * 60, "age11" + "q" * 60,
+                              "age1yubikey1" + "q" * 19, "age1yu/bikey1" + "q" * 60,
                               RECIPIENT + "\n", "ssh-ed25519 AAAA\nx"):
                 fake = FakeAge()
                 with self.assertRaisesRegex(ValueError, "^Invalid age recipient"):

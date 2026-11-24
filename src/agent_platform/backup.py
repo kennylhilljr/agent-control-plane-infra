@@ -17,17 +17,17 @@ from .inventory import CommandResult, run_command
 
 # age writes this header first; anything else in the output is not ciphertext.
 AGE_HEADER = b"age-encryption.org/v1\n"
-# Encrypting a large state folder can take a while; age never prompts when
-# only recipients are given, so a long timeout cannot hang on input.
+# Encrypting a large state folder can take a while. age does not prompt for
+# native or SSH recipients; a plugin may wait on a device, which this bounds.
 AGE_TIMEOUT_SECONDS = 600.0
 # Public recipients only: a native age X25519 key, another Bech32 age recipient
 # (age1pq1, age1tag1, or a plugin recipient such as age1yubikey1), or an
-# OpenSSH public key line (its comment may contain spaces). Lowercase
-# letters and digits only, so a recipient cannot be read as an age option.
-# The pattern also keeps a recipient from being read as an age option.
+# OpenSSH public key line (its comment may contain spaces). Every form starts
+# with age1 or ssh-, so a recipient cannot be read as an age option. Only the
+# character set is checked; age itself verifies the Bech32 checksum.
 _AGE_RECIPIENT = re.compile(
     r"age1[02-9ac-hj-np-z]{58}"
-    r"|age1[a-z0-9]{1,32}1[02-9ac-hj-np-z]{20,4000}"
+    r"|age1[a-z0-9-]{1,32}1[02-9ac-hj-np-z]{20,4000}"
     r"|(ssh-ed25519|ssh-rsa) [A-Za-z0-9+/]+={0,2}( [\x20-\x7e]*)?"
 )
 # Folder names that sync clients create. Matching is a heuristic: it catches
