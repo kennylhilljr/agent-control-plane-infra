@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 import tarfile
@@ -10,7 +11,30 @@ import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Callable, Sequence
+
+from .inventory import CommandResult, run_command
+
+# age writes this header first; anything else in the output is not ciphertext.
+AGE_HEADER = b"age-encryption.org/v1\n"
+# Encrypting a large state folder can take a while. age does not prompt for
+# native or SSH recipients; a plugin may wait on a device, which this bounds.
+AGE_TIMEOUT_SECONDS = 600.0
+# Public recipients only: a native age X25519 key, another Bech32 age recipient
+# (age1pq1, age1tag1, or a plugin recipient such as age1yubikey1), or an
+# OpenSSH public key line (its comment may contain spaces). Every form starts
+# with age1 or ssh-, so a recipient cannot be read as an age option. Only the
+# character set is checked; age itself verifies the Bech32 checksum.
+_AGE_RECIPIENT = re.compile(
+    r"age1[02-9ac-hj-np-z]{58}"
+    r"|age1[a-z0-9-]{1,32}1[02-9ac-hj-np-z]{20,4000}"
+    r"|(ssh-ed25519|ssh-rsa) [A-Za-z0-9+/]+={0,2}( [\x20-\x7e]*)?"
+)
+# Folder names that sync clients create. Matching is a heuristic: it catches
+# the common clients' default locations, not every synchronized folder.
+_SYNCED_PART_PREFIXES = ("dropbox", "onedrive", "google drive", "googledrive", "icloud",
+                         "box sync", "pcloud", "nextcloud", "owncloud", "syncthing")
+_SYNCED_PARTS = {"mobile documents", "cloudstorage", "my drive", "box"}
 
 
 @dataclass(frozen=True)
@@ -22,6 +46,7 @@ class BackupResult:
     archive: Path
     manifest: Path
     link_count: int = 0
+    encrypted: bool = False
 
 
 class SourceChangedDuringBackup(RuntimeError):
@@ -58,12 +83,38 @@ def _paths_overlap(source: Path, destination: Path) -> bool:
             or _contains_by_identity(destination, source))
 
 
+def looks_synchronized(path: Path) -> bool:
+    """True when a folder name in ``path`` matches a common sync client's
+    default location (iCloud Drive, Dropbox, OneDrive, Google Drive and so
+    on). A heuristic: an unlisted synchronized folder is not detected."""
+    for part in path.parts:
+        lowered = part.lower()
+        if lowered in _SYNCED_PARTS or lowered.startswith(_SYNCED_PART_PREFIXES):
+            return True
+    return False
+
+
 class BackupManager:
     EXCLUDED_TOP_LEVEL = {"logs", "tmp"}
 
-    def __init__(self, source: Path, destination: Path) -> None:
+    def __init__(
+        self,
+        source: Path,
+        destination: Path,
+        *,
+        encrypt_to: Sequence[str] = (),
+        allow_unencrypted: bool = False,
+        locate: Callable[[str], str | None] = shutil.which,
+        run: Callable[..., CommandResult] = run_command,
+        staging_root: Path | None = None,
+    ) -> None:
         self.source = source.expanduser().resolve()
         self.destination = destination.expanduser().resolve()
+        self.encrypt_to = tuple(encrypt_to)
+        self.allow_unencrypted = allow_unencrypted
+        self.locate = locate
+        self.run = run
+        self.staging_root = staging_root
 
     def create(self, *, dry_run: bool = False) -> BackupResult:
         if not self.source.is_dir():
@@ -73,16 +124,104 @@ class BackupManager:
                 f"Backup destination must not overlap the source: "
                 f"source={self.source} destination={self.destination}"
             )
+        age = self._encryption_preflight()
+        staging_root = self._staging_root() if age is not None else None
         files, enum_stats, links = self._source_entries()
         checkpoint_name = datetime.now(UTC).strftime("openclaw-%Y%m%dT%H%M%S.%fZ")
         checkpoint = self.destination / checkpoint_name
-        archive_path = checkpoint / "openclaw-state.tar.gz"
+        plain_name = "openclaw-state.tar.gz"
+        archive_name = plain_name + ".age" if age else plain_name
+        archive_path = checkpoint / archive_name
         manifest_path = checkpoint / "manifest.json"
         if dry_run:
             return BackupResult(False, False, len(files), checkpoint, archive_path, manifest_path,
-                                len(links))
+                                len(links), encrypted=age is not None)
 
+        staging: Path | None = None
+        if staging_root is not None:
+            # mkdtemp creates the folder with mode 0700.
+            staging = Path(tempfile.mkdtemp(prefix="agent-platform-backup-", dir=staging_root))
+        try:
+            result = self._create(files, enum_stats, links, checkpoint, archive_path,
+                                  manifest_path, age, staging)
+        except BaseException as error:
+            if staging is not None:
+                shutil.rmtree(staging, ignore_errors=True)
+                if staging.exists() or staging.is_symlink():
+                    # Plaintext left behind matters more than the first
+                    # error, which stays attached as the cause.
+                    raise OSError(
+                        f"Could not remove encryption staging folder: {staging}"
+                    ) from error
+            raise
+        if staging is not None:
+            # The plaintext archive lives only here, so a success that cannot
+            # remove it is reported as a failure rather than left silently.
+            shutil.rmtree(staging, ignore_errors=True)
+            if staging.exists() or staging.is_symlink():
+                raise OSError(f"Could not remove encryption staging folder: {staging}")
+        return result
+
+    def _encryption_preflight(self) -> str | None:
+        """Check the encryption options and return the age executable, or
+        None for an unencrypted backup."""
+        if not self.encrypt_to:
+            if looks_synchronized(self.destination) and not self.allow_unencrypted:
+                raise ValueError(
+                    f"Unencrypted backup refused for a synchronized destination: "
+                    f"{self.destination}. Pass --encrypt-to or --allow-unencrypted."
+                )
+            return None
+        for recipient in self.encrypt_to:
+            if not _AGE_RECIPIENT.fullmatch(recipient):
+                raise ValueError(
+                    "Invalid age recipient: use an age1... recipient or an "
+                    "ssh-ed25519/ssh-rsa public key line"
+                )
+        age = self.locate("age")
+        if not age:
+            raise ValueError("age is required for --encrypt-to but was not found on PATH")
+        return age
+
+    def _staging_root(self) -> Path:
+        """Check and return the folder that will hold a new 0700 staging
+        folder for the plaintext archive and its restore check: staging_root
+        (default: the system temporary directory). It must not overlap the
+        destination or look synchronized, so plaintext never reaches a folder
+        that may be uploaded, and inside the source it must sit under an
+        excluded top-level folder. Dry runs check it too."""
+        root = Path(self.staging_root or tempfile.gettempdir()).expanduser().resolve()
+        if _paths_overlap(root, self.destination):
+            raise ValueError(
+                f"Encryption staging folder must not overlap the backup destination: {root}"
+            )
+        if looks_synchronized(root):
+            raise ValueError(
+                f"Encryption staging folder must not look synchronized: {root}"
+            )
+        if _paths_overlap(root, self.source) and not any(
+            _contains_by_identity(self.source / name, root) for name in self.EXCLUDED_TOP_LEVEL
+        ):
+            raise ValueError(
+                f"Encryption staging folder must not overlap the source: {root}"
+            )
+        if not root.is_dir():
+            raise NotADirectoryError(root)
+        return root
+
+    def _create(
+        self,
+        files: list[Path],
+        enum_stats: dict[Path, tuple[int, int, int, int]],
+        links: dict[str, str],
+        checkpoint: Path,
+        archive_path: Path,
+        manifest_path: Path,
+        age: str | None,
+        staging: Path | None,
+    ) -> BackupResult:
         self._prepare_destination(checkpoint)
+        plain_path = (staging or checkpoint) / "openclaw-state.tar.gz"
         expected: dict[str, str] = {}
         post_hash_stats: dict[Path, tuple[int, int, int, int]] = {}
         for path in files:
@@ -105,7 +244,7 @@ class BackupManager:
                 raise _source_changed(relative_posix)
             post_hash_stats[path] = post_hash_snap
             expected[relative_posix] = digest
-        with tarfile.open(archive_path, "w:gz") as archive:
+        with tarfile.open(plain_path, "w:gz") as archive:
             self._after_archive_opened(archive)
             for path in files:
                 relative = path.relative_to(self.source)
@@ -143,8 +282,17 @@ class BackupManager:
             )
             if added_or_removed:
                 raise _source_changed(added_or_removed[0])
-        archive_path.chmod(0o600)
-        self.verify_archive(archive_path, expected)
+        plain_path.chmod(0o600)
+        self.verify_archive(plain_path, expected)
+        encryption: dict[str, Any] | None = None
+        if age is not None and staging is not None:
+            encryption = {
+                "tool": "age",
+                "recipients": list(self.encrypt_to),
+                "plaintext_archive": plain_path.name,
+                "plaintext_archive_sha256": _sha256(plain_path),
+            }
+            self._encrypt(age, plain_path, staging, archive_path)
         archive_sha256 = _sha256(archive_path)
         checksum_path = archive_path.with_name(archive_path.name + ".sha256")
         _write_private(checksum_path, f"{archive_sha256}  {archive_path.name}\n")
@@ -156,7 +304,7 @@ class BackupManager:
             for path in files
         }
         manifest = {
-            "schema_version": "1.1",
+            "schema_version": "1.2",
             "created_at": datetime.now(UTC).isoformat(),
             "source": str(self.source),
             "excluded_top_level": sorted(self.EXCLUDED_TOP_LEVEL),
@@ -173,10 +321,35 @@ class BackupManager:
             "symlinks": links,
             "symlink_policy": "recorded-not-followed",
             "restore_verified": True,
+            # The restore check ran on the plaintext archive before it was
+            # encrypted; the plaintext was then removed from staging.
+            "encryption": encryption,
         }
         _write_private(manifest_path, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
         return BackupResult(True, True, len(files), checkpoint, archive_path, manifest_path,
-                            len(links))
+                            len(links), encrypted=encryption is not None)
+
+    def _encrypt(self, age: str, plain_path: Path, staging: Path, archive_path: Path) -> None:
+        """Encrypt plain_path to the recipients inside staging, check the age
+        header, then copy the ciphertext into a new 0600 file at archive_path."""
+        staged = staging / (archive_path.name)
+        command: list[str] = [age, "--encrypt"]
+        for recipient in self.encrypt_to:
+            command += ["--recipient", recipient]
+        command += ["--output", str(staged), "--", str(plain_path)]
+        result = self.run(tuple(command), timeout=AGE_TIMEOUT_SECONDS)
+        if result.timed_out:
+            raise ValueError("age encryption failed: timed out")
+        if result.returncode != 0:
+            raise ValueError(f"age encryption failed: exit status {result.returncode}")
+        try:
+            with staged.open("rb") as stream:
+                header = stream.read(len(AGE_HEADER))
+        except FileNotFoundError:
+            header = b""
+        if header != AGE_HEADER:
+            raise ValueError("age encryption failed: output is not an age file")
+        _copy_private(staged, archive_path)
 
     def _source_files(self) -> list[Path]:
         return self._source_entries()[0]
@@ -279,6 +452,14 @@ def _write_private(path: Path, text: str) -> None:
     with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
         stream.write(text)
     path.chmod(0o600)
+
+
+def _copy_private(source: Path, target: Path) -> None:
+    """Copy source to a new file at target created with mode 0600."""
+    descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "wb") as output, source.open("rb") as stream:
+        shutil.copyfileobj(stream, output, 1024 * 1024)
+    target.chmod(0o600)
 
 
 def _stat_snapshot(path: Path) -> tuple[int, int, int, int]:

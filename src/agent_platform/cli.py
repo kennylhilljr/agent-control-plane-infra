@@ -29,11 +29,18 @@ KNOWN_VALUE_ERROR_PREFIXES = (
     "Disposable restore checksums do not match source snapshot",
     "Unsafe archive path: ",
     "Unsafe archive member: ",
+    "Unencrypted backup refused for a synchronized destination: ",
+    "Invalid age recipient: ",
+    "age is required for --encrypt-to but was not found on PATH",
+    "age encryption failed: ",
+    "Encryption staging folder must not overlap ",
+    "Encryption staging folder must not look synchronized: ",
 )
 # OSError messages raised by this package with a path and fixed text.
 KNOWN_OS_ERROR_PREFIXES = (
     "OpenClaw state directory not found: ",
     "Backup root must not grant group/other access: ",
+    "Could not remove encryption staging folder: ",
 )
 GENERIC_VALUE_ERROR = "Validation failed; details are withheld so no file contents are shown"
 _LINE_BREAKS = re.compile(r"[\r\n\v\f\x1c-\x1e\x85  ]+")
@@ -50,6 +57,11 @@ def parser() -> argparse.ArgumentParser:
     backup.add_argument("--backup-dir", required=True, type=Path)
     backup.add_argument("--source", type=Path, default=Path("~/.openclaw"))
     backup.add_argument("--dry-run", action="store_true")
+    backup.add_argument("--encrypt-to", action="append", default=[], metavar="RECIPIENT",
+                        help="Encrypt the archive with age to this public recipient "
+                             "(repeatable)")
+    backup.add_argument("--allow-unencrypted", action="store_true",
+                        help="Allow an unencrypted archive in a folder that looks synchronized")
     backup.add_argument("--json", action="store_true")
     return root
 
@@ -241,7 +253,18 @@ def _run_inventory(args: argparse.Namespace) -> int:
 
 
 def _run_backup(args: argparse.Namespace) -> int:
-    result = BackupManager(args.source, args.backup_dir).create(dry_run=args.dry_run)
+    result = BackupManager(
+        args.source, args.backup_dir,
+        encrypt_to=args.encrypt_to, allow_unencrypted=args.allow_unencrypted,
+    ).create(dry_run=args.dry_run)
+    warnings = ["Live logs and the tmp/ scratch directory are intentionally excluded from rollback state."]
+    if not result.encrypted:
+        warnings.append("The archive is not encrypted; keep it on an encrypted, access-controlled "
+                        "volume that is not synchronized, or pass --encrypt-to.")
+    if args.encrypt_to:
+        encryption_status = "passed" if result.changed else "not-run"
+    else:
+        encryption_status = "skipped"
     envelope = build_envelope(
         "backup",
         ok=True,
@@ -254,8 +277,9 @@ def _run_backup(args: argparse.Namespace) -> int:
                 "name": "disposable-restore",
                 "status": "passed" if result.verified else "not-run",
             },
+            {"name": "age-encryption", "status": encryption_status},
         ],
-        warnings=["Live logs and the tmp/ scratch directory are intentionally excluded from rollback state."],
+        warnings=warnings,
         rollback_checkpoint=str(result.checkpoint_dir),
         archive=str(result.archive),
         manifest=str(result.manifest),

@@ -18,7 +18,7 @@ The implementation is intentionally small. It does not run the orchestrator, dis
 This repository is an active migration workspace, not a finished control-plane product. The current CLI supports:
 
 - `inventory`: records host, runner, provider-presence, OpenClaw, ECC, and Git metadata without reading credential values, prompts, messages, or file contents.
-- `backup`: creates an owner-only OpenClaw checkpoint, excludes live logs and the top-level tmp/ scratch directory, writes SHA-256 checksums, and verifies a disposable restore before reporting success.
+- `backup`: creates an owner-only OpenClaw checkpoint, excludes live logs and the top-level tmp/ scratch directory, writes SHA-256 checksums, verifies a disposable restore before reporting success, and with `--encrypt-to` encrypts the archive with age.
 
 [`MIGRATION_SPEC.md`](MIGRATION_SPEC.md) describes the target architecture and acceptance gates. The draft [`TEAM-DELIVERY v8`](docs/TEAM-DELIVERY-v8.md) guide defines plan readiness, cross-unit contracts, run hygiene, and milestone close; use its [`run-guide template`](docs/templates/TEAM-DELIVERY-v8-run-guide.md) for individual runs. [`TODO.md`](TODO.md) is the durable status ledger, and [`USER_ACTIONS.md`](USER_ACTIONS.md) tracks decisions that need an operator. TEAM-DELIVERY v8 remains pending owner approval.
 
@@ -126,9 +126,25 @@ openclaw-<UTC timestamp>/
 └── openclaw-state.tar.gz.sha256
 ```
 
-The backup root and checkpoint directory must not grant group or other access. Archives and manifests are written with mode `0600`; checkpoint directories use `0700`. The command rejects symbolic links and unsafe archive members, excludes the top-level `logs/` and `tmp/` directories, restores the archive into a `0700` folder inside the checkpoint (removed when the check ends, pass or fail, unless the process is killed mid-check; nothing is written under the system temporary directory), and compares every restored file checksum with the source. `openclaw-state.tar.gz.sha256` (mode `0600`) holds the archive checksum in the format `shasum -a 256 -c openclaw-state.tar.gz.sha256` reads from inside the checkpoint folder. The manifest (`schema_version` `1.1`) maps each file to its SHA-256 under `files` and to its `size` in bytes and permission `mode` (4-digit octal string) under `file_metadata`.
+The backup root and checkpoint directory must not grant group or other access. Archives and manifests are written with mode `0600`; checkpoint directories use `0700`. The command rejects symbolic links and unsafe archive members, excludes the top-level `logs/` and `tmp/` directories, restores the archive into a `0700` folder inside the checkpoint (removed when the check ends, pass or fail, unless the process is killed mid-check; without `--encrypt-to` nothing is written under the system temporary directory), and compares every restored file checksum with the source. `openclaw-state.tar.gz.sha256` (mode `0600`) holds the archive checksum in the format `shasum -a 256 -c openclaw-state.tar.gz.sha256` reads from inside the checkpoint folder. The manifest (`schema_version` `1.2`) maps each file to its SHA-256 under `files` and to its `size` in bytes and permission `mode` (4-digit octal string) under `file_metadata`, and records the encryption settings under `encryption` (`null` for an unencrypted archive).
 
-The archive is compressed, not encrypted. OpenClaw state can contain credentials and private session data, so keep checkpoints outside Git on an encrypted, access-controlled volume. Never attach them to issues or pull requests.
+OpenClaw state can contain credentials and private session data. Without `--encrypt-to` the archive is compressed, not encrypted, and the result envelope carries a warning saying so; keep such checkpoints outside Git on an encrypted, access-controlled volume that is not synchronized. Never attach checkpoints to issues or pull requests.
+
+### Encrypt the checkpoint
+
+`--encrypt-to RECIPIENT` encrypts the archive with [age](https://age-encryption.org) (install it first, for example `brew install age`). `RECIPIENT` is a public key: an `age1...` recipient (from `age-keygen`, `age-keygen -pq`, or an age plugin such as `age-plugin-yubikey`), or an `ssh-ed25519`/`ssh-rsa` public key line. Repeat the option to add recipients. Keep the matching private identity off the backup volume.
+
+```bash
+./bin/agent-platform backup \
+  --source "$HOME/.openclaw" \
+  --backup-dir "$HOME/AgentPlatformBackups" \
+  --encrypt-to "age1<your public key>" \
+  --json
+```
+
+The plaintext archive is built in a new `0700` folder under the system temporary directory (`TMPDIR`), restore-checked there, encrypted, and then removed, pass or fail (a successful run fails instead when the staging folder cannot be removed); the staging folder may not overlap the backup root or look synchronized (checked by `--dry-run` too), and a failed run that cannot remove it reports that instead of its first error, and inside the source it may only sit under the excluded `tmp/` or `logs/` folders. The checkpoint then holds `openclaw-state.tar.gz.age`, `openclaw-state.tar.gz.age.sha256` (the ciphertext checksum) and `manifest.json`, whose `encryption` object lists the tool, the recipients and the SHA-256 of the plaintext archive. The command checks that age wrote an age header, but it cannot decrypt, so the disposable restore check runs on the plaintext before encryption. To restore, decrypt with the private identity first: `age --decrypt -i key.txt -o openclaw-state.tar.gz openclaw-state.tar.gz.age`.
+
+An unencrypted backup into a folder whose path looks synchronized (iCloud Drive's `Mobile Documents`, `Library/CloudStorage`, Dropbox, OneDrive, Google Drive and similar client folders) is refused unless `--allow-unencrypted` is passed. The check matches folder names only, so it does not catch every synchronized folder, such as Desktop and Documents synced by iCloud.
 
 ## Configure provider detection
 
@@ -164,14 +180,17 @@ Without `--repository`, the command checks the default paths declared in `src/ag
 ### `backup`
 
 ```text
-./bin/agent-platform backup --backup-dir PATH [--source PATH] [--dry-run] [--json]
+./bin/agent-platform backup --backup-dir PATH [--source PATH] [--encrypt-to RECIPIENT ...]
+                     [--allow-unencrypted] [--dry-run] [--json]
 ```
 
 | Option | Behavior |
 | --- | --- |
 | `--backup-dir PATH` | Required destination for timestamped checkpoints. |
 | `--source PATH` | OpenClaw state to back up; defaults to `~/.openclaw`. |
-| `--dry-run` | Enumerates eligible files and reports planned paths without creating the destination. |
+| `--encrypt-to RECIPIENT` | Encrypts the archive with age to this public recipient. Repeat for more recipients. See [Encrypt the checkpoint](#encrypt-the-checkpoint). |
+| `--allow-unencrypted` | Allows an unencrypted archive in a folder whose path looks synchronized. |
+| `--dry-run` | Enumerates eligible files and reports planned paths without creating the destination. Encryption options are checked too. |
 | `--json` | Requests the JSON result envelope. The current implementation emits the envelope for backup operations in both modes. |
 
 ## Repository layout

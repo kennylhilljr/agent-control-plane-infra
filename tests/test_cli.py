@@ -213,8 +213,13 @@ class BackupCliTests(CliTestCase):
                     {"name": "file-enumeration", "status": "passed", "count": 2},
                     {"name": "symlinks-recorded-not-followed", "status": "passed", "count": 1},
                     {"name": "disposable-restore", "status": "passed"},
+                    {"name": "age-encryption", "status": "skipped"},
                 ],
-                "warnings": ["Live logs and the tmp/ scratch directory are intentionally excluded from rollback state."],
+                "warnings": [
+                    "Live logs and the tmp/ scratch directory are intentionally excluded from rollback state.",
+                    "The archive is not encrypted; keep it on an encrypted, access-controlled "
+                    "volume that is not synchronized, or pass --encrypt-to.",
+                ],
                 "required_user_actions": [],
                 "rollback_checkpoint": str(result.checkpoint_dir),
                 "archive": str(result.archive),
