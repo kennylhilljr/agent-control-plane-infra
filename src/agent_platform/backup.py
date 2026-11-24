@@ -20,12 +20,14 @@ AGE_HEADER = b"age-encryption.org/v1\n"
 # Encrypting a large state folder can take a while; age never prompts when
 # only recipients are given, so a long timeout cannot hang on input.
 AGE_TIMEOUT_SECONDS = 600.0
-# Public recipients only: a native age X25519 or post-quantum (age1pq1) key, or
-# an OpenSSH public key line (its comment may contain spaces).
+# Public recipients only: a native age X25519 key, another Bech32 age recipient
+# (age1pq1, age1tag1, or a plugin recipient such as age1yubikey1), or an
+# OpenSSH public key line (its comment may contain spaces). Lowercase
+# letters and digits only, so a recipient cannot be read as an age option.
 # The pattern also keeps a recipient from being read as an age option.
 _AGE_RECIPIENT = re.compile(
     r"age1[02-9ac-hj-np-z]{58}"
-    r"|age1pq1[02-9ac-hj-np-z]{100,4000}"
+    r"|age1[a-z0-9]{1,32}1[02-9ac-hj-np-z]{20,4000}"
     r"|(ssh-ed25519|ssh-rsa) [A-Za-z0-9+/]+={0,2}( [\x20-\x7e]*)?"
 )
 # Folder names that sync clients create. Matching is a heuristic: it catches
@@ -173,7 +175,7 @@ class BackupManager:
         for recipient in self.encrypt_to:
             if not _AGE_RECIPIENT.fullmatch(recipient):
                 raise ValueError(
-                    "Invalid age recipient: use an age1 or age1pq1 public key or an "
+                    "Invalid age recipient: use an age1... recipient or an "
                     "ssh-ed25519/ssh-rsa public key line"
                 )
         age = self.locate("age")

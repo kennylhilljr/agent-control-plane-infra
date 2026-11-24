@@ -132,7 +132,7 @@ OpenClaw state can contain credentials and private session data. Without `--encr
 
 ### Encrypt the checkpoint
 
-`--encrypt-to RECIPIENT` encrypts the archive with [age](https://age-encryption.org) (install it first, for example `brew install age`). `RECIPIENT` is a public key: an `age1...` key from `age-keygen` (or an `age1pq1...` key from `age-keygen -pq`), or an `ssh-ed25519`/`ssh-rsa` public key line. Repeat the option to add recipients. Keep the matching private identity off the backup volume.
+`--encrypt-to RECIPIENT` encrypts the archive with [age](https://age-encryption.org) (install it first, for example `brew install age`). `RECIPIENT` is a public key: an `age1...` recipient (from `age-keygen`, `age-keygen -pq`, or an age plugin such as `age-plugin-yubikey`), or an `ssh-ed25519`/`ssh-rsa` public key line. Repeat the option to add recipients. Keep the matching private identity off the backup volume.
 
 ```bash
 ./bin/agent-platform backup \

@@ -186,7 +186,8 @@ class EncryptedBackupTests(unittest.TestCase):
     def test_post_quantum_and_commented_ssh_recipients_are_accepted(self) -> None:
         with fixture_root() as root:
             source = make_source(root)
-            for recipient in ("age1pq1" + "q" * 1950, SSH_RECIPIENT + " with spaces in comment"):
+            for recipient in ("age1pq1" + "q" * 1950, "age1yubikey1" + "q" * 60,
+                              "age1tag1" + "q" * 60, SSH_RECIPIENT + " with spaces in comment"):
                 fake = FakeAge()
                 result = manager(root, source, root / "backups", fake,
                                  encrypt_to=(recipient,)).create(dry_run=True)
@@ -196,6 +197,7 @@ class EncryptedBackupTests(unittest.TestCase):
         with fixture_root() as root:
             source = make_source(root)
             for recipient in ("--output=/etc/passwd", "age1short", "AGE-SECRET-KEY-1ABC",
+                              "age1Yubikey1" + "q" * 60, "age1yubikey1" + "b" * 60,
                               RECIPIENT + "\n", "ssh-ed25519 AAAA\nx"):
                 fake = FakeAge()
                 with self.assertRaisesRegex(ValueError, "^Invalid age recipient"):
