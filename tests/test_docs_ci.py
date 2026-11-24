@@ -79,6 +79,8 @@ class DocsCiTests(unittest.TestCase):
 
         self.assertIsNotNone(re.search(r"^on:\n(?:[ ]+.*\n)*?[ ]+push:", y, re.M))
         self.assertIsNotNone(re.search(r"^on:\n(?:[ ]+.*\n)*?[ ]+pull_request:", y, re.M))
+        self.assertIsNotNone(re.search(r"^  push:\n    branches: \[main\]\n", y, re.M))
+        self.assertIsNotNone(re.search(r"^  pull_request:\n    branches: \[main\]\n", y, re.M))
 
     def test_setup_python_uses_matrix_version(self) -> None:
         """DOCS-CI-04: setup-python reads the matrix Python version."""
