@@ -183,6 +183,15 @@ class EncryptedBackupTests(unittest.TestCase):
             self.assertFalse((root / "backups").exists())
             self.assertEqual(list((root / "staging").iterdir()), [])
 
+    def test_post_quantum_and_commented_ssh_recipients_are_accepted(self) -> None:
+        with fixture_root() as root:
+            source = make_source(root)
+            for recipient in ("age1pq1" + "q" * 1950, SSH_RECIPIENT + " with spaces in comment"):
+                fake = FakeAge()
+                result = manager(root, source, root / "backups", fake,
+                                 encrypt_to=(recipient,)).create(dry_run=True)
+                self.assertTrue(result.encrypted, recipient[:12])
+
     def test_invalid_recipients_are_refused_before_anything_runs(self) -> None:
         with fixture_root() as root:
             source = make_source(root)
@@ -257,6 +266,30 @@ class StagingSafetyTests(unittest.TestCase):
                               locate=locate_age, run=fake, staging_root=staging).create()
             self.assertEqual(fake.calls, [])
             self.assertEqual(list(staging.iterdir()), [])
+
+    def test_dry_run_checks_the_staging_root(self) -> None:
+        with fixture_root() as root:
+            source = make_source(root)
+            staging = root / "OneDrive" / "tmp"
+            staging.mkdir(parents=True)
+            with self.assertRaisesRegex(ValueError, "staging folder must not look synchronized"):
+                BackupManager(source, root / "backups", encrypt_to=(RECIPIENT,),
+                              locate=locate_age, run=FakeAge(),
+                              staging_root=staging).create(dry_run=True)
+            with self.assertRaises(NotADirectoryError):
+                BackupManager(source, root / "backups", encrypt_to=(RECIPIENT,),
+                              locate=locate_age, run=FakeAge(),
+                              staging_root=root / "missing").create(dry_run=True)
+
+    def test_failure_reports_staging_left_behind(self) -> None:
+        with fixture_root() as root:
+            source = make_source(root)
+            with unittest.mock.patch("agent_platform.backup.shutil.rmtree",
+                                     lambda *a, **k: None):
+                with self.assertRaisesRegex(
+                        OSError, "^Could not remove encryption staging folder: ") as caught:
+                    manager(root, source, root / "backups", FakeAge(returncode=1)).create()
+            self.assertIsInstance(caught.exception.__cause__, ValueError)
 
     def test_success_fails_when_staging_cannot_be_removed(self) -> None:
         with fixture_root() as root:

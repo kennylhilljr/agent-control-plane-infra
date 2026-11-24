@@ -132,7 +132,7 @@ OpenClaw state can contain credentials and private session data. Without `--encr
 
 ### Encrypt the checkpoint
 
-`--encrypt-to RECIPIENT` encrypts the archive with [age](https://age-encryption.org) (install it first, for example `brew install age`). `RECIPIENT` is a public key: an `age1...` key from `age-keygen`, or an `ssh-ed25519`/`ssh-rsa` public key line. Repeat the option to add recipients. Keep the matching private identity off the backup volume.
+`--encrypt-to RECIPIENT` encrypts the archive with [age](https://age-encryption.org) (install it first, for example `brew install age`). `RECIPIENT` is a public key: an `age1...` key from `age-keygen` (or an `age1pq1...` key from `age-keygen -pq`), or an `ssh-ed25519`/`ssh-rsa` public key line. Repeat the option to add recipients. Keep the matching private identity off the backup volume.
 
 ```bash
 ./bin/agent-platform backup \
@@ -142,7 +142,7 @@ OpenClaw state can contain credentials and private session data. Without `--encr
   --json
 ```
 
-The plaintext archive is built in a new `0700` folder under the system temporary directory (`TMPDIR`), restore-checked there, encrypted, and then removed, pass or fail (a successful run fails instead when the staging folder cannot be removed); the staging folder may not overlap the backup root or look synchronized, and inside the source it may only sit under the excluded `tmp/` or `logs/` folders. The checkpoint then holds `openclaw-state.tar.gz.age`, `openclaw-state.tar.gz.age.sha256` (the ciphertext checksum) and `manifest.json`, whose `encryption` object lists the tool, the recipients and the SHA-256 of the plaintext archive. The command checks that age wrote an age header, but it cannot decrypt, so the disposable restore check runs on the plaintext before encryption. To restore, decrypt with the private identity first: `age --decrypt -i key.txt -o openclaw-state.tar.gz openclaw-state.tar.gz.age`.
+The plaintext archive is built in a new `0700` folder under the system temporary directory (`TMPDIR`), restore-checked there, encrypted, and then removed, pass or fail (a successful run fails instead when the staging folder cannot be removed); the staging folder may not overlap the backup root or look synchronized (checked by `--dry-run` too), and a failed run that cannot remove it reports that instead of its first error, and inside the source it may only sit under the excluded `tmp/` or `logs/` folders. The checkpoint then holds `openclaw-state.tar.gz.age`, `openclaw-state.tar.gz.age.sha256` (the ciphertext checksum) and `manifest.json`, whose `encryption` object lists the tool, the recipients and the SHA-256 of the plaintext archive. The command checks that age wrote an age header, but it cannot decrypt, so the disposable restore check runs on the plaintext before encryption. To restore, decrypt with the private identity first: `age --decrypt -i key.txt -o openclaw-state.tar.gz openclaw-state.tar.gz.age`.
 
 An unencrypted backup into a folder whose path looks synchronized (iCloud Drive's `Mobile Documents`, `Library/CloudStorage`, Dropbox, OneDrive, Google Drive and similar client folders) is refused unless `--allow-unencrypted` is passed. The check matches folder names only, so it does not catch every synchronized folder, such as Desktop and Documents synced by iCloud.
 

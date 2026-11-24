@@ -20,11 +20,13 @@ AGE_HEADER = b"age-encryption.org/v1\n"
 # Encrypting a large state folder can take a while; age never prompts when
 # only recipients are given, so a long timeout cannot hang on input.
 AGE_TIMEOUT_SECONDS = 600.0
-# Public recipients only: a native age X25519 key or an OpenSSH public key.
+# Public recipients only: a native age X25519 or post-quantum (age1pq1) key, or
+# an OpenSSH public key line (its comment may contain spaces).
 # The pattern also keeps a recipient from being read as an age option.
 _AGE_RECIPIENT = re.compile(
     r"age1[02-9ac-hj-np-z]{58}"
-    r"|(ssh-ed25519|ssh-rsa) [A-Za-z0-9+/]+={0,2}( [\x21-\x7e]+)?"
+    r"|age1pq1[02-9ac-hj-np-z]{100,4000}"
+    r"|(ssh-ed25519|ssh-rsa) [A-Za-z0-9+/]+={0,2}( [\x20-\x7e]*)?"
 )
 # Folder names that sync clients create. Matching is a heuristic: it catches
 # the common clients' default locations, not every synchronized folder.
@@ -121,6 +123,7 @@ class BackupManager:
                 f"source={self.source} destination={self.destination}"
             )
         age = self._encryption_preflight()
+        staging_root = self._staging_root() if age is not None else None
         files, enum_stats, links = self._source_entries()
         checkpoint_name = datetime.now(UTC).strftime("openclaw-%Y%m%dT%H%M%S.%fZ")
         checkpoint = self.destination / checkpoint_name
@@ -133,15 +136,21 @@ class BackupManager:
                                 len(links), encrypted=age is not None)
 
         staging: Path | None = None
-        if age is not None:
-            staging = self._make_staging()
+        if staging_root is not None:
+            # mkdtemp creates the folder with mode 0700.
+            staging = Path(tempfile.mkdtemp(prefix="agent-platform-backup-", dir=staging_root))
         try:
             result = self._create(files, enum_stats, links, checkpoint, archive_path,
                                   manifest_path, age, staging)
-        except BaseException:
+        except BaseException as error:
             if staging is not None:
-                # Keep the error that explains the failure; cleanup is best effort.
                 shutil.rmtree(staging, ignore_errors=True)
+                if staging.exists() or staging.is_symlink():
+                    # Plaintext left behind matters more than the first
+                    # error, which stays attached as the cause.
+                    raise OSError(
+                        f"Could not remove encryption staging folder: {staging}"
+                    ) from error
             raise
         if staging is not None:
             # The plaintext archive lives only here, so a success that cannot
@@ -164,20 +173,21 @@ class BackupManager:
         for recipient in self.encrypt_to:
             if not _AGE_RECIPIENT.fullmatch(recipient):
                 raise ValueError(
-                    "Invalid age recipient: use an age1 public key or an "
-                    "ssh-ed25519/ssh-rsa public key"
+                    "Invalid age recipient: use an age1 or age1pq1 public key or an "
+                    "ssh-ed25519/ssh-rsa public key line"
                 )
         age = self.locate("age")
         if not age:
             raise ValueError("age is required for --encrypt-to but was not found on PATH")
         return age
 
-    def _make_staging(self) -> Path:
-        """A new 0700 folder for the plaintext archive and its restore check,
-        under staging_root (default: the system temporary directory). It must
-        not overlap the destination, so plaintext never reaches a folder that
-        may be synchronized, and inside the source it must sit under an
-        excluded top-level folder."""
+    def _staging_root(self) -> Path:
+        """Check and return the folder that will hold a new 0700 staging
+        folder for the plaintext archive and its restore check: staging_root
+        (default: the system temporary directory). It must not overlap the
+        destination or look synchronized, so plaintext never reaches a folder
+        that may be uploaded, and inside the source it must sit under an
+        excluded top-level folder. Dry runs check it too."""
         root = Path(self.staging_root or tempfile.gettempdir()).expanduser().resolve()
         if _paths_overlap(root, self.destination):
             raise ValueError(
@@ -193,8 +203,9 @@ class BackupManager:
             raise ValueError(
                 f"Encryption staging folder must not overlap the source: {root}"
             )
-        # mkdtemp creates the folder with mode 0700.
-        return Path(tempfile.mkdtemp(prefix="agent-platform-backup-", dir=root))
+        if not root.is_dir():
+            raise NotADirectoryError(root)
+        return root
 
     def _create(
         self,
