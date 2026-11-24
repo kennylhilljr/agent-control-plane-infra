@@ -34,11 +34,13 @@ KNOWN_VALUE_ERROR_PREFIXES = (
     "age is required for --encrypt-to but was not found on PATH",
     "age encryption failed: ",
     "Encryption staging folder must not overlap ",
+    "Encryption staging folder must not look synchronized: ",
 )
 # OSError messages raised by this package with a path and fixed text.
 KNOWN_OS_ERROR_PREFIXES = (
     "OpenClaw state directory not found: ",
     "Backup root must not grant group/other access: ",
+    "Could not remove encryption staging folder: ",
 )
 GENERIC_VALUE_ERROR = "Validation failed; details are withheld so no file contents are shown"
 _LINE_BREAKS = re.compile(r"[\r\n\v\f\x1c-\x1e\x85  ]+")

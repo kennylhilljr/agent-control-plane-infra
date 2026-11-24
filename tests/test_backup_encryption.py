@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import shutil
 import stat
 import sys
 import tempfile
@@ -242,6 +243,37 @@ class EncryptedBackupTests(unittest.TestCase):
                                    staging_root=source / "tmp").create()
             self.assertTrue(result.encrypted)
             self.assertEqual(list((source / "tmp").iterdir()), [])
+
+
+class StagingSafetyTests(unittest.TestCase):
+    def test_synchronized_staging_root_is_refused(self) -> None:
+        with fixture_root() as root:
+            source = make_source(root)
+            staging = root / "Dropbox" / "tmp"
+            staging.mkdir(parents=True)
+            fake = FakeAge()
+            with self.assertRaisesRegex(ValueError, "staging folder must not look synchronized"):
+                BackupManager(source, root / "backups", encrypt_to=(RECIPIENT,),
+                              locate=locate_age, run=fake, staging_root=staging).create()
+            self.assertEqual(fake.calls, [])
+            self.assertEqual(list(staging.iterdir()), [])
+
+    def test_success_fails_when_staging_cannot_be_removed(self) -> None:
+        with fixture_root() as root:
+            source = make_source(root)
+            real_rmtree = shutil.rmtree
+            with unittest.mock.patch("agent_platform.backup.shutil.rmtree",
+                                     lambda *a, **k: None):
+                with self.assertRaisesRegex(OSError,
+                                            "^Could not remove encryption staging folder: "):
+                    manager(root, source, root / "backups", FakeAge()).create()
+            for leftover in (root / "staging").iterdir():
+                real_rmtree(leftover)
+
+    def test_cli_reports_staging_cleanup_failure_as_handled(self) -> None:
+        error = OSError("Could not remove encryption staging folder: /tmp/x")
+        self.assertEqual(cli.safe_error_message(error),
+                         "Could not remove encryption staging folder: /tmp/x")
 
 
 class EncryptionCliTests(unittest.TestCase):

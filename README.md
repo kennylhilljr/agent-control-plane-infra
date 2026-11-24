@@ -142,7 +142,7 @@ OpenClaw state can contain credentials and private session data. Without `--encr
   --json
 ```
 
-The plaintext archive is built in a new `0700` folder under the system temporary directory (`TMPDIR`), restore-checked there, encrypted, and then removed, pass or fail; the staging folder may not overlap the backup root, and inside the source it may only sit under the excluded `tmp/` or `logs/` folders. The checkpoint then holds `openclaw-state.tar.gz.age`, `openclaw-state.tar.gz.age.sha256` (the ciphertext checksum) and `manifest.json`, whose `encryption` object lists the tool, the recipients and the SHA-256 of the plaintext archive. The command checks that age wrote an age header, but it cannot decrypt, so the disposable restore check runs on the plaintext before encryption. To restore, decrypt with the private identity first: `age --decrypt -i key.txt -o openclaw-state.tar.gz openclaw-state.tar.gz.age`.
+The plaintext archive is built in a new `0700` folder under the system temporary directory (`TMPDIR`), restore-checked there, encrypted, and then removed, pass or fail (a successful run fails instead when the staging folder cannot be removed); the staging folder may not overlap the backup root or look synchronized, and inside the source it may only sit under the excluded `tmp/` or `logs/` folders. The checkpoint then holds `openclaw-state.tar.gz.age`, `openclaw-state.tar.gz.age.sha256` (the ciphertext checksum) and `manifest.json`, whose `encryption` object lists the tool, the recipients and the SHA-256 of the plaintext archive. The command checks that age wrote an age header, but it cannot decrypt, so the disposable restore check runs on the plaintext before encryption. To restore, decrypt with the private identity first: `age --decrypt -i key.txt -o openclaw-state.tar.gz openclaw-state.tar.gz.age`.
 
 An unencrypted backup into a folder whose path looks synchronized (iCloud Drive's `Mobile Documents`, `Library/CloudStorage`, Dropbox, OneDrive, Google Drive and similar client folders) is refused unless `--allow-unencrypted` is passed. The check matches folder names only, so it does not catch every synchronized folder, such as Desktop and Documents synced by iCloud.
 
@@ -180,14 +180,17 @@ Without `--repository`, the command checks the default paths declared in `src/ag
 ### `backup`
 
 ```text
-./bin/agent-platform backup --backup-dir PATH [--source PATH] [--dry-run] [--json]
+./bin/agent-platform backup --backup-dir PATH [--source PATH] [--encrypt-to RECIPIENT ...]
+                     [--allow-unencrypted] [--dry-run] [--json]
 ```
 
 | Option | Behavior |
 | --- | --- |
 | `--backup-dir PATH` | Required destination for timestamped checkpoints. |
 | `--source PATH` | OpenClaw state to back up; defaults to `~/.openclaw`. |
-| `--dry-run` | Enumerates eligible files and reports planned paths without creating the destination. |
+| `--encrypt-to RECIPIENT` | Encrypts the archive with age to this public recipient. Repeat for more recipients. See [Encrypt the checkpoint](#encrypt-the-checkpoint). |
+| `--allow-unencrypted` | Allows an unencrypted archive in a folder whose path looks synchronized. |
+| `--dry-run` | Enumerates eligible files and reports planned paths without creating the destination. Encryption options are checked too. |
 | `--json` | Requests the JSON result envelope. The current implementation emits the envelope for backup operations in both modes. |
 
 ## Repository layout

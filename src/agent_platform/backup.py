@@ -136,12 +136,20 @@ class BackupManager:
         if age is not None:
             staging = self._make_staging()
         try:
-            return self._create(files, enum_stats, links, checkpoint, archive_path,
-                                manifest_path, age, staging)
-        finally:
+            result = self._create(files, enum_stats, links, checkpoint, archive_path,
+                                  manifest_path, age, staging)
+        except BaseException:
             if staging is not None:
-                # The plaintext archive lives only here; remove it pass or fail.
+                # Keep the error that explains the failure; cleanup is best effort.
                 shutil.rmtree(staging, ignore_errors=True)
+            raise
+        if staging is not None:
+            # The plaintext archive lives only here, so a success that cannot
+            # remove it is reported as a failure rather than left silently.
+            shutil.rmtree(staging, ignore_errors=True)
+            if staging.exists() or staging.is_symlink():
+                raise OSError(f"Could not remove encryption staging folder: {staging}")
+        return result
 
     def _encryption_preflight(self) -> str | None:
         """Check the encryption options and return the age executable, or
@@ -174,6 +182,10 @@ class BackupManager:
         if _paths_overlap(root, self.destination):
             raise ValueError(
                 f"Encryption staging folder must not overlap the backup destination: {root}"
+            )
+        if looks_synchronized(root):
+            raise ValueError(
+                f"Encryption staging folder must not look synchronized: {root}"
             )
         if _paths_overlap(root, self.source) and not any(
             _contains_by_identity(self.source / name, root) for name in self.EXCLUDED_TOP_LEVEL
