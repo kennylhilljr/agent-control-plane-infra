@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import gzip
 import hashlib
 import json
 import os
@@ -39,7 +38,7 @@ _SYNCED_PART_PREFIXES = ("dropbox", "onedrive", "google drive", "googledrive", "
 _SYNCED_PARTS = {"mobile documents", "cloudstorage", "my drive", "box"}
 
 CORRUPT_ARCHIVE_MESSAGE = (
-    "Archive compressed stream is corrupt: gzip CRC, length or deflate data check failed"
+    "Archive compressed stream is corrupt: gzip header, CRC, length or deflate data check failed"
 )
 
 
@@ -419,8 +418,9 @@ class BackupManager:
     @staticmethod
     def verify_archive(archive_path: Path, expected: dict[str, str], *,
                        restore_root: Path | None = None) -> None:
-        """First decompress the whole gzip stream so the gzip CRC and length
-        are checked, raising ValueError when that fails. Then restore the
+        """First validate the gzip header strictly and decompress the whole
+        gzip stream so the gzip CRC and length are checked, raising
+        ValueError when that fails. Then restore the
         archive into a new 0700 folder under restore_root (default: the
         archive's folder) and compare checksums. The folder is removed when
         verification ends, pass or fail; nothing is created under
@@ -501,14 +501,105 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+class _CorruptGzip(Exception):
+    """Internal marker for a malformed gzip stream."""
+
+
+_GZIP_FHCRC = 0x02
+_GZIP_FEXTRA = 0x04
+_GZIP_FNAME = 0x08
+_GZIP_FCOMMENT = 0x10
+_GZIP_RESERVED = 0xE0
+_CHUNK = 1024 * 1024
+_FIELD_CHUNK = 64 * 1024
+
+
+def _read_exact(stream: Any, size: int) -> bytes:
+    data = stream.read(size)
+    if len(data) != size:
+        raise _CorruptGzip("truncated")
+    return data
+
+
+def _skip_zero_terminated(stream: Any, crc: int) -> int:
+    """Skip an FNAME or FCOMMENT field and return the header CRC updated with
+    it. The field is scanned in _FIELD_CHUNK pieces and never kept whole, so
+    a long or unterminated field costs bounded memory."""
+    while True:
+        data = stream.read(_FIELD_CHUNK)
+        if not data:
+            raise _CorruptGzip("truncated")
+        end = data.find(b"\x00")
+        if end < 0:
+            crc = zlib.crc32(data, crc)
+            continue
+        crc = zlib.crc32(data[:end + 1], crc)
+        stream.seek(end + 1 - len(data), os.SEEK_CUR)
+        return crc
+
+
 def _check_gzip_stream(path: Path) -> None:
-    """Decompress the whole gzip stream so its CRC32 and length trailer are
-    checked. tarfile stops at the tar end-of-archive marker and can leave the
-    tail of the stream unread."""
-    with gzip.open(path, "rb") as stream:
+    """Validate the archive as exactly one strict RFC 1952 gzip member.
+
+    The header must have the gzip magic, the deflate method and no reserved
+    FLG bits (Python's gzip reader ignores them), an FHCRC header checksum
+    must match, the whole deflate stream is decompressed so the CRC32 and
+    ISIZE trailer are checked (tarfile stops at the tar end marker), and no
+    bytes may follow the trailer."""
+    with path.open("rb") as stream:
         try:
-            while stream.read(1024 * 1024):
-                pass
-        except (gzip.BadGzipFile, EOFError, zlib.error) as error:
+            _check_gzip_member(stream)
+        except (_CorruptGzip, zlib.error) as error:
             raise ValueError(CORRUPT_ARCHIVE_MESSAGE) from error
+
+
+def _check_gzip_member(stream: Any) -> None:
+    header = _read_exact(stream, 10)
+    if header[:3] != b"\x1f\x8b\x08":
+        raise _CorruptGzip("bad magic or method")
+    flags = header[3]
+    if flags & _GZIP_RESERVED:
+        raise _CorruptGzip("reserved flag bits set")
+    header_crc = zlib.crc32(header)
+    if flags & _GZIP_FEXTRA:
+        length_bytes = _read_exact(stream, 2)
+        header_crc = zlib.crc32(length_bytes, header_crc)
+        # XLEN is at most 65535, so reading the field whole stays bounded.
+        extra = _read_exact(stream, int.from_bytes(length_bytes, "little"))
+        header_crc = zlib.crc32(extra, header_crc)
+    if flags & _GZIP_FNAME:
+        header_crc = _skip_zero_terminated(stream, header_crc)
+    if flags & _GZIP_FCOMMENT:
+        header_crc = _skip_zero_terminated(stream, header_crc)
+    if flags & _GZIP_FHCRC:
+        expected_header_crc = int.from_bytes(_read_exact(stream, 2), "little")
+        if header_crc & 0xFFFF != expected_header_crc:
+            raise _CorruptGzip("header CRC mismatch")
+
+    # Each decompress call returns at most _CHUNK bytes; input it did not
+    # consume waits in unconsumed_tail, so memory stays bounded however
+    # compressible the archive is.
+    inflater = zlib.decompressobj(-zlib.MAX_WBITS)
+    crc = 0
+    size = 0
+    while not inflater.eof:
+        chunk = inflater.unconsumed_tail or stream.read(_CHUNK)
+        data = inflater.decompress(chunk, _CHUNK)
+        if not chunk and not data and not inflater.eof:
+            raise _CorruptGzip("truncated deflate stream")
+        crc = zlib.crc32(data, crc)
+        size += len(data)
+    # No flush(): at eof all output has been returned, and flush() would feed
+    # unconsumed_tail (which still holds the bytes after the deflate end) in
+    # again and append them to unused_data a second time.
+
+    tail = inflater.unused_data
+    if len(tail) < 8:
+        tail += _read_exact(stream, 8 - len(tail))
+    if int.from_bytes(tail[:4], "little") != crc:
+        raise _CorruptGzip("CRC32 mismatch")
+    if int.from_bytes(tail[4:8], "little") != size & 0xFFFFFFFF:
+        raise _CorruptGzip("ISIZE mismatch")
+    if tail[8:] or stream.read(1):
+        raise _CorruptGzip("trailing data after gzip member")
 
