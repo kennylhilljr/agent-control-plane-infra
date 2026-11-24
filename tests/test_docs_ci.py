@@ -4,7 +4,9 @@ import re
 import unittest
 from pathlib import Path
 
-DOC = Path(__file__).resolve().parents[1] / "docs" / "ci.md"
+ROOT = Path(__file__).resolve().parents[1]
+DOC = ROOT / "docs" / "ci.md"
+WORKFLOW = ROOT / ".github" / "workflows" / "check.yml"
 RT = chr(34) + "$RUNNER_TEMP/gitleaks" + chr(34)
 SHA = "5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba"
 URL = (
@@ -16,15 +18,39 @@ URL = (
 class DocsCiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.text = DOC.read_text(encoding="utf-8")
-        self.fences = re.findall(r"^```yaml\n(.*?)^```$", self.text, re.S | re.M)
+        self.workflow = WORKFLOW.read_text(encoding="utf-8")
 
     def yaml(self) -> str:
-        self.assertEqual(len(self.fences), 1)
-        return self.fences[0]
+        return self.workflow
 
-    def test_doc_has_exactly_one_yaml_fence(self) -> None:
-        """DOCS-CI-01: docs/ci.md holds exactly one yaml fence."""
-        self.assertEqual(len(self.fences), 1)
+    def test_doc_has_no_workflow_copy(self) -> None:
+        """DOCS-CI-01: docs/ci.md points at the committed workflow instead of a copy that can drift."""
+        self.assertNotIn("```yaml", self.text)
+        self.assertIn(".github/workflows/check.yml", self.text)
+
+    def test_workflow_token_is_read_only(self) -> None:
+        """DOCS-CI-11: the workflow sets a top-level read-only token and no job widens it."""
+        y = self.yaml()
+
+        self.assertIsNotNone(re.search(r"^permissions:\n  contents: read\n(?!  \S)", y, re.M))
+        self.assertEqual(len(re.findall(r"^\s*permissions:", y, re.M)), 1)
+        self.assertNotIn("write", y)
+        self.assertNotIn("secrets.", y)
+        self.assertNotIn("pull_request_target", y)
+
+    def test_actions_are_pinned_to_commit_shas(self) -> None:
+        """DOCS-CI-12: every uses: line names a full 40-hex commit SHA with a version comment."""
+        uses = re.findall(r"^\s*-?\s*uses:\s*(.+)$", self.yaml(), re.M)
+
+        self.assertGreaterEqual(len(uses), 2)
+        for ref in uses:
+            self.assertRegex(ref, r"^[\w.-]+/[\w.-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$")
+
+    def test_checkout_does_not_persist_token(self) -> None:
+        """DOCS-CI-13: checkout leaves the token out of the clone that gitleaks scans."""
+        self.assertIsNotNone(
+            re.search(r"uses: actions/checkout@\S+.*\n\s+with:\n\s+persist-credentials: false\n", self.yaml())
+        )
 
     def test_workflow_contains_required_pieces(self) -> None:
         """DOCS-CI-02: the workflow names triggers, matrix, actions and the pinned gitleaks download."""
@@ -131,9 +157,10 @@ class DocsCiTests(unittest.TestCase):
         self.assertNotIn("inventories/latest.json", self.text)
 
     def test_doc_has_no_en_or_em_dash(self) -> None:
-        """DOCS-CI-09: the doc has no en or em dash."""
-        self.assertNotIn(chr(0x2013), self.text)
-        self.assertNotIn(chr(0x2014), self.text)
+        """DOCS-CI-09: the doc and the workflow have no en or em dash."""
+        for text in (self.text, self.workflow):
+            self.assertNotIn(chr(0x2013), text)
+            self.assertNotIn(chr(0x2014), text)
 
 
 if __name__ == "__main__":
