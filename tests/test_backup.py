@@ -546,7 +546,7 @@ class _CheckpointAssertions:
     def test_manifest_records_size_and_mode(self) -> None:
         result = BackupManager(self.source, self.destination).create()
         manifest = json.loads(result.manifest.read_text())
-        self.assertEqual(manifest["schema_version"], "1.1")
+        self.assertEqual(manifest["schema_version"], "1.2")
         self.assertEqual(manifest["file_metadata"], {
             "cron/jobs.json": {"size": len('{"jobs":[]}'), "mode": "0640"},
             "openclaw.json": {"size": len('{"mode":"test"}'), "mode": "0600"},
