@@ -83,7 +83,7 @@ jobs:
       matrix:
         pr: ${{ fromJSON(needs.find.outputs.prs) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ matrix.pr.sha }}
           fetch-depth: 0
