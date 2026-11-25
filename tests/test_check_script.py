@@ -120,9 +120,10 @@ class CheckScriptTests(unittest.TestCase):
         extra_env: dict[str, str] | None = None,
         cwd: pathlib.Path | None = None,
         script: str = "scripts/check.sh",
+        path: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         env = {
-            "PATH": os.pathsep.join([str(self.tools), "/usr/bin", "/bin"]),
+            "PATH": path or os.pathsep.join([str(self.tools), "/usr/bin", "/bin"]),
             "HOME": str(self.home),
             "TMPDIR": str(self.tmpdir),
             "SHIM_RECORD": str(self.record),
@@ -226,8 +227,16 @@ class CheckScriptTests(unittest.TestCase):
         self.assertNotIn("==> secret scan", result.stdout)
 
     def test_shellcheck_absent_skipped(self) -> None:
+        # Runners such as GitHub's Ubuntu image ship shellcheck in /usr/bin,
+        # so PATH holds only the fixture tools dir with the binaries check.sh
+        # needs linked in.
         self.add_shim("gitleaks")
-        result = self.run_check()
+        for name in ("sh", "dirname"):
+            found = shutil.which(name, path="/usr/bin:/bin")
+            self.assertIsNotNone(found, name)
+            assert found is not None
+            os.symlink(found, self.tools / name)
+        result = self.run_check(path=str(self.tools))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("shellcheck not installed", result.stdout)
 

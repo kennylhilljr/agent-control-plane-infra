@@ -255,8 +255,10 @@ Mac and in a Linux sandbox. An independent review found 2 critical, 4 high,
   command. 2026-11-24: `scripts/check.sh` gained a coverage floor of 80
   percent, a ruff lint and a strict mypy type check (a missing tool fails
   unless `ALLOW_NO_DEV_TOOLS=1`), and `.github/dependabot.yml` covers GitHub Actions
-  and pip. Still open (see `docs/ci.md`): the `.github/workflows/check.yml`
-  workflow, formatter, diff coverage, dependency vulnerability and SBOM gates.
+  and pip. 2026-11-24: `.github/workflows/check.yml` runs that script on
+  pushes and pull requests to `main`. Still open (see `docs/ci.md`): making
+  `check` a required status check on `main`, formatter, diff coverage,
+  dependency vulnerability and SBOM gates.
 - [ ] **AUTO** Publish operator, incident, backup, restore, and upgrade runbooks.
 - [x] **AUTO** Schedule recurring runner doctor and model-catalog refresh.
   2026-10-18: launchd agent `local.openclaw-ecc-orchestrator.recertify` runs
