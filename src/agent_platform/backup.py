@@ -49,7 +49,15 @@ _LINUX_LOCAL_FSTYPES = frozenset({
 # "local" option for local volumes; Linux "DEVICE on POINT type FSTYPE (OPTIONS)".
 _DARWIN_MOUNT_LINE = re.compile(r"^.*? on (?P<point>/.*) \((?P<options>[^()]*)\)$")
 _LINUX_MOUNT_LINE = re.compile(r"^.*? on (?P<point>/.*) type (?P<fstype>\S+) \([^()]*\)$")
+# Linux `mount` may print a space, tab, newline or backslash in a mount point
+# as an octal escape (\040, \011, \012, \134), as /proc/mounts does.
+_OCTAL_ESCAPE = re.compile(r"\\([0-7]{3})")
 MOUNT_TIMEOUT_SECONDS = 5.0
+
+
+def _mount_table_supported(platform: str) -> bool:
+    """True for the platforms whose `mount` output local_mount_points reads."""
+    return platform == "darwin" or platform.startswith("linux")
 
 CORRUPT_ARCHIVE_MESSAGE = (
     "Archive compressed stream is corrupt: gzip header, CRC, length or deflate data check failed"
@@ -118,6 +126,8 @@ def local_mount_points(mount_output: str, platform: str) -> list[Path] | None:
     the platform's output format is not supported. On macOS an entry is
     local when its options include "local"; on Linux when its type is in
     _LINUX_LOCAL_FSTYPES. Lines that do not parse are skipped."""
+    if not _mount_table_supported(platform):
+        return None
     points: list[Path] = []
     for line in mount_output.splitlines():
         if platform == "darwin":
@@ -127,12 +137,11 @@ def local_mount_points(mount_output: str, platform: str) -> list[Path] | None:
             options = {option.strip() for option in match.group("options").split(",")}
             if "local" in options:
                 points.append(Path(match.group("point")))
-        elif platform.startswith("linux"):
+        else:
             match = _LINUX_MOUNT_LINE.match(line)
             if match is not None and match.group("fstype") in _LINUX_LOCAL_FSTYPES:
-                points.append(Path(match.group("point")))
-        else:
-            return None
+                point = _OCTAL_ESCAPE.sub(lambda m: chr(int(m.group(1), 8)), match.group("point"))
+                points.append(Path(point))
     return points
 
 
@@ -158,12 +167,18 @@ def is_on_local_filesystem(
     only local mount points are examined, so a hung network mount is never
     touched. Any failure (unsupported platform, `mount` missing, failing or
     timing out, no matching local mount) returns False: fail closed."""
-    if not (platform == "darwin" or platform.startswith("linux")):
+    if not _mount_table_supported(platform):
         return False
     device = _nearest_existing_device(path)
     if device is None:
         return False
-    result = run(("mount",), timeout=MOUNT_TIMEOUT_SECONDS)
+    try:
+        result = run(("mount",), timeout=MOUNT_TIMEOUT_SECONDS)
+    except OSError:
+        # run_command reports OSError in its result; a runner that raises
+        # it instead still fails closed. Other exceptions propagate, as
+        # unexpected errors do everywhere in the CLI.
+        return False
     if result.timed_out or result.returncode != 0:
         return False
     points = local_mount_points(result.stdout, platform)

@@ -97,6 +97,10 @@ class LocalMountPointsTests(unittest.TestCase):
             Path("/"), Path("/tmp"), Path("/var/lib/x"),
         ])
 
+    def test_linux_octal_escapes_are_decoded(self) -> None:
+        output = r"/dev/sdb1 on /mnt/back\040up\134x type ext4 (rw)"
+        self.assertEqual(local_mount_points(output, "linux"), [Path("/mnt/back up\\x")])
+
     def test_unsupported_platform_returns_none(self) -> None:
         self.assertIsNone(local_mount_points("/dev/x on / (ufs, local)", "freebsd14"))
         self.assertIsNone(local_mount_points("C: on / type ntfs (rw)", "win32"))
@@ -152,6 +156,13 @@ class IsOnLocalFilesystemTests(unittest.TestCase):
             for fake in (FakeMount(line, returncode=1), FakeMount(line, returncode=None),
                          FakeMount(line, returncode=None, timed_out=True), FakeMount("")):
                 self.assertFalse(is_on_local_filesystem(root, fake, "darwin"))
+
+    def test_runner_oserror_is_not_local(self) -> None:
+        def raising(command: tuple[str, ...], timeout: float = 5.0) -> CommandResult:
+            raise FileNotFoundError("mount")
+
+        with fixture_root() as root:
+            self.assertFalse(is_on_local_filesystem(root, raising, "darwin"))
 
     def test_unsupported_platform_is_not_local_and_runs_nothing(self) -> None:
         with fixture_root() as root:
