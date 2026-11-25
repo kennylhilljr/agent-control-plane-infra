@@ -12,7 +12,7 @@ import zlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable, Sequence
+from typing import Any, BinaryIO, Callable, Sequence
 
 from .inventory import CommandResult, run_command
 
@@ -514,14 +514,14 @@ _CHUNK = 1024 * 1024
 _FIELD_CHUNK = 64 * 1024
 
 
-def _read_exact(stream: Any, size: int) -> bytes:
+def _read_exact(stream: BinaryIO, size: int) -> bytes:
     data = stream.read(size)
     if len(data) != size:
         raise _CorruptGzip("truncated")
     return data
 
 
-def _skip_zero_terminated(stream: Any, crc: int) -> int:
+def _skip_zero_terminated(stream: BinaryIO, crc: int) -> int:
     """Skip an FNAME or FCOMMENT field and return the header CRC updated with
     it. The field is scanned in _FIELD_CHUNK pieces and never kept whole, so
     a long or unterminated field costs bounded memory."""
@@ -553,7 +553,7 @@ def _check_gzip_stream(path: Path) -> None:
             raise ValueError(CORRUPT_ARCHIVE_MESSAGE) from error
 
 
-def _check_gzip_member(stream: Any) -> None:
+def _check_gzip_member(stream: BinaryIO) -> None:
     header = _read_exact(stream, 10)
     if header[:3] != b"\x1f\x8b\x08":
         raise _CorruptGzip("bad magic or method")
