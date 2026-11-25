@@ -75,8 +75,11 @@ class AgentsReviewRulesTests(unittest.TestCase):
             self.assertIn(needle, rule)
 
     def test_verify_archive_rule(self) -> None:
+        """test_verify_archive_rule: the verify_archive bullet names the gzip
+        CRC check and the rejected member kinds."""
         rule = self.bullet("verify_archive")
-        for needle in ("absolute", "`..`", "symlink", "hard link", "device"):
+        for needle in ("absolute", "`..`", "symlink", "hard link", "device", "CRC",
+                       "reserved FLG bits"):
             self.assertIn(needle, rule)
 
     def test_json_rule(self) -> None:

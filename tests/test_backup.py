@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import errno
+import gzip
 import hashlib
 import inspect
 import json
@@ -8,8 +9,10 @@ import os
 import sys
 import tarfile
 import tempfile
+import tracemalloc
 import unittest
 import unittest.mock as mock
+import zlib
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path, PurePosixPath
@@ -530,6 +533,9 @@ class _CheckpointAssertions:
         self.assertEqual(manifest["checksum_file"], "openclaw-state.tar.gz.sha256")
 
     def test_corrupted_archive_fails_verification(self) -> None:
+        """test_corrupted_archive_fails_verification: a flipped byte in the
+        middle of the archive raises the corrupt compressed stream ValueError
+        and leaves no restore folder behind."""
         result = BackupManager(self.source, self.destination).create()
         manifest = json.loads(result.manifest.read_text())
         data = bytearray(result.archive.read_bytes())
@@ -537,11 +543,170 @@ class _CheckpointAssertions:
         result.archive.write_bytes(bytes(data))
         self.assertNotEqual(hashlib.sha256(bytes(data)).hexdigest(),
                             manifest["archive_sha256"])
-        with self.assertRaises((ValueError, tarfile.TarError, OSError, EOFError)):
+        with self.assertRaisesRegex(ValueError, "Archive compressed stream is corrupt"):
             BackupManager.verify_archive(result.archive, manifest["files"])
         self.assertEqual(
             [path.name for path in result.checkpoint_dir.iterdir()
              if path.name.startswith(".restore-check-")], [])
+
+    def test_corrupted_gzip_trailer_fails_verification(self) -> None:
+        """test_corrupted_gzip_trailer_fails_verification: a flipped byte in
+        the gzip CRC32 or ISIZE trailer raises the corrupt compressed stream
+        ValueError and leaves no restore folder behind."""
+        # tarfile never reads the gzip trailer on Python 3.11, so this failed before the fix.
+        result = BackupManager(self.source, self.destination).create()
+        manifest = json.loads(result.manifest.read_text())
+        original = result.archive.read_bytes()
+        for offset in (-8, -1):
+            with self.subTest(offset=offset):
+                data = bytearray(original)
+                data[offset] ^= 0xFF
+                result.archive.write_bytes(bytes(data))
+                with self.assertRaisesRegex(ValueError, "Archive compressed stream is corrupt"):
+                    BackupManager.verify_archive(result.archive, manifest["files"])
+        self.assertEqual(
+            [path.name for path in result.checkpoint_dir.iterdir()
+             if path.name.startswith(".restore-check-")], [])
+
+    def test_malformed_gzip_header_fails_verification(self) -> None:
+        """test_malformed_gzip_header_fails_verification: a reserved FLG bit,
+        a method byte other than deflate or bytes after the gzip trailer raise
+        the corrupt compressed stream ValueError and leave no restore folder
+        behind."""
+        # Python's gzip reader ignores reserved FLG bits, so data[3] |= 0x20 passed before the fix.
+        result = BackupManager(self.source, self.destination).create()
+        manifest = json.loads(result.manifest.read_text())
+        original = result.archive.read_bytes()
+        cases = [
+            ("reserved FLG 0x20", 3, 0x20),
+            ("reserved FLG 0x80", 3, 0x80),
+            ("method not deflate", 2, 0x01),
+        ]
+        for name, offset, bit in cases:
+            with self.subTest(case=name):
+                data = bytearray(original)
+                data[offset] |= bit
+                result.archive.write_bytes(bytes(data))
+                with self.assertRaisesRegex(ValueError, "Archive compressed stream is corrupt"):
+                    BackupManager.verify_archive(result.archive, manifest["files"])
+        with self.subTest(case="trailing data"):
+            result.archive.write_bytes(original + b"\x00")
+            with self.assertRaisesRegex(ValueError, "Archive compressed stream is corrupt"):
+                BackupManager.verify_archive(result.archive, manifest["files"])
+        self.assertEqual(
+            [path.name for path in result.checkpoint_dir.iterdir()
+             if path.name.startswith(".restore-check-")], [])
+        result.archive.write_bytes(original)
+        BackupManager.verify_archive(result.archive, manifest["files"])
+
+    @staticmethod
+    def _rebuild_gzip(original: bytes, *, extra: bytes, name: bytes,
+                      comment: bytes, header_crc_delta: int = 0) -> bytes:
+        """Rewrap the archive's tar payload in a gzip member that sets FEXTRA,
+        FNAME, FCOMMENT and FHCRC. header_crc_delta is XORed into the stored
+        header CRC."""
+        payload = gzip.decompress(original)
+        compressor = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
+        body = compressor.compress(payload) + compressor.flush()
+        header = (b"\x1f\x8b\x08" + bytes([0x02 | 0x04 | 0x08 | 0x10])
+                  + b"\x00\x00\x00\x00\x00\xff"
+                  + len(extra).to_bytes(2, "little") + extra
+                  + name + b"\x00" + comment + b"\x00")
+        header_crc = (zlib.crc32(header) & 0xFFFF) ^ header_crc_delta
+        trailer = (zlib.crc32(payload).to_bytes(4, "little")
+                   + (len(payload) & 0xFFFFFFFF).to_bytes(4, "little"))
+        return header + header_crc.to_bytes(2, "little") + body + trailer
+
+    def test_gzip_header_crc_is_checked(self) -> None:
+        """test_gzip_header_crc_is_checked: an archive with FEXTRA, FNAME,
+        FCOMMENT and a matching FHCRC verifies; a wrong stored header CRC or a
+        changed FNAME, FCOMMENT or FEXTRA byte under the old CRC raises the
+        corrupt compressed stream ValueError and leaves no restore folder."""
+        # Python's gzip reader skips FHCRC without checking it, so only the
+        # strict header check catches these.
+        result = BackupManager(self.source, self.destination).create()
+        manifest = json.loads(result.manifest.read_text())
+        original = result.archive.read_bytes()
+        fields = {"extra": b"AB\x02\x00xy", "name": b"state.tar", "comment": b"note"}
+        valid = self._rebuild_gzip(original, **fields)
+        result.archive.write_bytes(valid)
+        BackupManager.verify_archive(result.archive, manifest["files"])
+
+        cases = {
+            "stored header CRC": self._rebuild_gzip(original, **fields,
+                                                    header_crc_delta=0x0001),
+            "FEXTRA byte": valid.replace(b"xy", b"xz", 1),
+            "FNAME byte": valid.replace(b"state.tar", b"state.taR", 1),
+            "FCOMMENT byte": valid.replace(b"note\x00", b"nOte\x00", 1),
+        }
+        for case, data in cases.items():
+            with self.subTest(case=case):
+                self.assertEqual(len(data), len(valid))
+                self.assertNotEqual(data, valid)
+                result.archive.write_bytes(data)
+                with self.assertRaisesRegex(ValueError, "Archive compressed stream is corrupt"):
+                    BackupManager.verify_archive(result.archive, manifest["files"])
+        self.assertEqual(
+            [path.name for path in result.checkpoint_dir.iterdir()
+             if path.name.startswith(".restore-check-")], [])
+
+    def test_unterminated_gzip_name_uses_bounded_memory(self) -> None:
+        """test_unterminated_gzip_name_uses_bounded_memory: a 16 MiB FNAME
+        field with no terminator raises the corrupt compressed stream
+        ValueError while the header check allocates far less than the field
+        size."""
+        # Before the fix the whole field was kept in memory before rejection.
+        result = BackupManager(self.source, self.destination).create()
+        field_size = 16 * 1024 * 1024
+        result.archive.write_bytes(
+            b"\x1f\x8b\x08\x08\x00\x00\x00\x00\x00\xff" + b"A" * field_size)
+        tracemalloc.start()
+        try:
+            with self.assertRaisesRegex(ValueError, "Archive compressed stream is corrupt"):
+                backup._check_gzip_stream(result.archive)
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        self.assertLess(peak, 2 * 1024 * 1024)
+
+    def test_missing_archive_raises_os_error(self) -> None:
+        """test_missing_archive_raises_os_error: a missing archive still
+        raises FileNotFoundError, not the corrupt stream ValueError."""
+        result = BackupManager(self.source, self.destination).create()
+        with self.assertRaises(FileNotFoundError):
+            BackupManager.verify_archive(result.archive.with_name("missing.tar.gz"), {})
+
+    def test_gzip_check_bounds_decompressed_output(self) -> None:
+        """test_gzip_check_bounds_decompressed_output: every decompress call
+        in the gzip stream check returns at most _CHUNK bytes, so a highly
+        compressible archive does not inflate a whole input chunk at once,
+        and the valid archive still verifies."""
+        # Before the fix decompress had no max_length, so one call returned far more than _CHUNK.
+        (self.source / "zeros.bin").write_bytes(b"\x00" * (4 * 1024 * 1024))
+        result = BackupManager(self.source, self.destination).create()
+        manifest = json.loads(result.manifest.read_text())
+        chunk = 4096
+        outputs: list[int] = []
+        real_decompressobj = backup.zlib.decompressobj
+
+        class Recorder:
+            def __init__(self, *args: object) -> None:
+                self._inner = real_decompressobj(*args)
+
+            def decompress(self, data: bytes, max_length: int = 0) -> bytes:
+                out = self._inner.decompress(data, max_length)
+                outputs.append(len(out))
+                return out
+
+            def __getattr__(self, name: str) -> object:
+                return getattr(self._inner, name)
+
+        with mock.patch.object(backup, "_CHUNK", chunk), \
+                mock.patch.object(backup.zlib, "decompressobj", Recorder):
+            backup._check_gzip_stream(result.archive)
+        self.assertGreater(sum(outputs), 4 * 1024 * 1024)
+        self.assertLessEqual(max(outputs), chunk)
+        BackupManager.verify_archive(result.archive, manifest["files"])
 
     def test_manifest_records_size_and_mode(self) -> None:
         result = BackupManager(self.source, self.destination).create()
