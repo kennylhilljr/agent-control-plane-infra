@@ -29,6 +29,7 @@ KNOWN_VALUE_ERROR_PREFIXES = (
     "Unsafe archive path: ",
     "Unsafe archive member: ",
     "Unencrypted backup refused for a synchronized destination: ",
+    "Unencrypted backup refused for a destination not confirmed local: ",
     "Invalid age recipient: ",
     "age is required for --encrypt-to but was not found on PATH",
     "age encryption failed: ",
@@ -61,7 +62,8 @@ def parser() -> argparse.ArgumentParser:
                         help="Encrypt the archive with age to this public recipient "
                              "(repeatable)")
     backup.add_argument("--allow-unencrypted", action="store_true",
-                        help="Allow an unencrypted archive in a folder that looks synchronized")
+                        help="Allow an unencrypted archive in a folder that looks "
+                             "synchronized or is not on a local file system")
     backup.add_argument("--json", action="store_true")
     return root
 

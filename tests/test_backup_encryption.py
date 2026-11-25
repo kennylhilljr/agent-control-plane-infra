@@ -19,6 +19,20 @@ from agent_platform import cli
 from agent_platform.backup import AGE_HEADER, BackupManager, looks_synchronized
 from agent_platform.inventory import CommandResult
 
+# Unencrypted backups ask `mount` whether the destination is local. These
+# tests are not about that check (tests/test_backup_mounts.py is), so a fake
+# answers "local" instead of running the real tool.
+_LOCAL_MOUNT_PATCH = unittest.mock.patch(
+    "agent_platform.backup.is_on_local_filesystem", return_value=True)
+
+
+def setUpModule() -> None:
+    _LOCAL_MOUNT_PATCH.start()
+
+
+def tearDownModule() -> None:
+    _LOCAL_MOUNT_PATCH.stop()
+
 
 def run_cli(argv: list[str]) -> tuple[int, str, str]:
     stdout, stderr = io.StringIO(), io.StringIO()

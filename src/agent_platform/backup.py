@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import stat
+import sys
 import tarfile
 import tempfile
 import zlib
@@ -36,6 +37,19 @@ _AGE_RECIPIENT = re.compile(
 _SYNCED_PART_PREFIXES = ("dropbox", "onedrive", "google drive", "googledrive", "icloud",
                          "box sync", "pcloud", "nextcloud", "owncloud", "syncthing")
 _SYNCED_PARTS = {"mobile documents", "cloudstorage", "my drive", "box"}
+# Linux file system types that live on this host. Anything else (nfs, cifs,
+# smb3, fuse.sshfs, davfs, 9p and unknown types) counts as not local, so an
+# unlisted type fails closed.
+_LINUX_LOCAL_FSTYPES = frozenset({
+    "apfs", "bcachefs", "btrfs", "erofs", "exfat", "ext2", "ext3", "ext4", "f2fs",
+    "fuseblk", "hfs", "hfsplus", "iso9660", "jfs", "msdos", "nilfs2", "ntfs", "ntfs3",
+    "overlay", "ramfs", "reiserfs", "squashfs", "tmpfs", "udf", "vfat", "xfs", "zfs",
+})
+# `mount` output lines: macOS "DEVICE on POINT (FSTYPE, OPTION, ...)" with a
+# "local" option for local volumes; Linux "DEVICE on POINT type FSTYPE (OPTIONS)".
+_DARWIN_MOUNT_LINE = re.compile(r"^.*? on (?P<point>/.*) \((?P<options>[^()]*)\)$")
+_LINUX_MOUNT_LINE = re.compile(r"^.*? on (?P<point>/.*) type (?P<fstype>\S+) \([^()]*\)$")
+MOUNT_TIMEOUT_SECONDS = 5.0
 
 CORRUPT_ARCHIVE_MESSAGE = (
     "Archive compressed stream is corrupt: gzip header, CRC, length or deflate data check failed"
@@ -99,6 +113,71 @@ def looks_synchronized(path: Path) -> bool:
     return False
 
 
+def local_mount_points(mount_output: str, platform: str) -> list[Path] | None:
+    """Mount points that `mount` lists as local file systems, or None when
+    the platform's output format is not supported. On macOS an entry is
+    local when its options include "local"; on Linux when its type is in
+    _LINUX_LOCAL_FSTYPES. Lines that do not parse are skipped."""
+    points: list[Path] = []
+    for line in mount_output.splitlines():
+        if platform == "darwin":
+            match = _DARWIN_MOUNT_LINE.match(line)
+            if match is None:
+                continue
+            options = {option.strip() for option in match.group("options").split(",")}
+            if "local" in options:
+                points.append(Path(match.group("point")))
+        elif platform.startswith("linux"):
+            match = _LINUX_MOUNT_LINE.match(line)
+            if match is not None and match.group("fstype") in _LINUX_LOCAL_FSTYPES:
+                points.append(Path(match.group("point")))
+        else:
+            return None
+    return points
+
+
+def _nearest_existing_device(path: Path) -> int | None:
+    """st_dev of path or of its nearest existing ancestor, following links."""
+    for candidate in (path, *path.parents):
+        try:
+            return os.stat(candidate).st_dev
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+    return None
+
+
+def is_on_local_filesystem(
+    path: Path,
+    run: Callable[..., CommandResult],
+    platform: str = sys.platform,
+) -> bool:
+    """True only when path (or, if it does not exist yet, its nearest existing
+    ancestor) is on a file system that `mount` lists as local. The match uses
+    the device number (st_dev) of the local mount points, not path text, so
+    case variants, symbolic links and macOS firmlinks resolve correctly, and
+    only local mount points are examined, so a hung network mount is never
+    touched. Any failure (unsupported platform, `mount` missing, failing or
+    timing out, no matching local mount) returns False: fail closed."""
+    if not (platform == "darwin" or platform.startswith("linux")):
+        return False
+    device = _nearest_existing_device(path)
+    if device is None:
+        return False
+    result = run(("mount",), timeout=MOUNT_TIMEOUT_SECONDS)
+    if result.timed_out or result.returncode != 0:
+        return False
+    points = local_mount_points(result.stdout, platform)
+    if not points:
+        return False
+    for point in points:
+        try:
+            if os.stat(point).st_dev == device:
+                return True
+        except OSError:
+            continue
+    return False
+
+
 class BackupManager:
     EXCLUDED_TOP_LEVEL = {"logs", "tmp"}
 
@@ -112,6 +191,7 @@ class BackupManager:
         locate: Callable[[str], str | None] = shutil.which,
         run: Callable[..., CommandResult] = run_command,
         staging_root: Path | None = None,
+        platform: str = sys.platform,
     ) -> None:
         self.source = source.expanduser().resolve()
         self.destination = destination.expanduser().resolve()
@@ -120,6 +200,7 @@ class BackupManager:
         self.locate = locate
         self.run = run
         self.staging_root = staging_root
+        self.platform = platform
 
     def create(self, *, dry_run: bool = False) -> BackupResult:
         if not self.source.is_dir():
@@ -171,10 +252,20 @@ class BackupManager:
         """Check the encryption options and return the age executable, or
         None for an unencrypted backup."""
         if not self.encrypt_to:
-            if looks_synchronized(self.destination) and not self.allow_unencrypted:
+            if self.allow_unencrypted:
+                return None
+            if looks_synchronized(self.destination):
                 raise ValueError(
                     f"Unencrypted backup refused for a synchronized destination: "
                     f"{self.destination}. Pass --encrypt-to or --allow-unencrypted."
+                )
+            if not is_on_local_filesystem(self.destination, self.run, self.platform):
+                # A network mount (SMB, NFS, AFP, WebDAV, sshfs) leaves the
+                # host; so may anything the mount table cannot confirm.
+                raise ValueError(
+                    f"Unencrypted backup refused for a destination not confirmed local: "
+                    f"{self.destination}. Its file system is a network mount or could not "
+                    f"be identified. Pass --encrypt-to or --allow-unencrypted."
                 )
             return None
         for recipient in self.encrypt_to:

@@ -25,6 +25,21 @@ from agent_platform.backup import BackupManager
 TARGET = "cron/jobs.json"
 
 
+# Unencrypted backups ask `mount` whether the destination is local. These
+# tests are not about that check (tests/test_backup_mounts.py is), so a fake
+# answers "local" instead of running the real tool.
+_LOCAL_MOUNT_PATCH = mock.patch("agent_platform.backup.is_on_local_filesystem",
+                                return_value=True)
+
+
+def setUpModule() -> None:
+    _LOCAL_MOUNT_PATCH.start()
+
+
+def tearDownModule() -> None:
+    _LOCAL_MOUNT_PATCH.stop()
+
+
 def _make_source(root: Path) -> Path:
     source = root / ".openclaw"
     (source / "cron").mkdir(parents=True)
