@@ -12,10 +12,56 @@ fail() {
     exit 1
 }
 
+# The lint, type check and coverage stages use the ruff, mypy and coverage
+# modules of the same python3 (install them with: pip install -e ".[dev]").
+# A missing module fails its stage unless ALLOW_NO_DEV_TOOLS=1 is set, which
+# skips it instead.
+have_module() {
+    python3 -c "import $1" >/dev/null 2>&1
+}
+
+missing_tool() {
+    if [ "${ALLOW_NO_DEV_TOOLS:-}" = "1" ]; then
+        echo "$1 not installed; skipped by ALLOW_NO_DEV_TOOLS=1"
+        return 0
+    fi
+    echo "$2 failed: python3 cannot import $1; run python3 -m pip install -e \".[dev]\" or set ALLOW_NO_DEV_TOOLS=1 to skip" >&2
+    exit 1
+}
+
 echo "==> unit tests"
 # Skip .pyc files: a test edited within the same second at the same size
 # would otherwise run from stale bytecode.
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python3 -m unittest discover -s tests || fail "unit tests"
+if have_module coverage; then
+    python3 -m coverage erase || fail "unit tests"
+    PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}" python3 -m coverage run --parallel-mode -m unittest discover -s tests || fail "unit tests"
+else
+    PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}" python3 -m unittest discover -s tests || fail "unit tests"
+fi
+
+echo "==> coverage"
+if have_module coverage; then
+    # Parallel data files from the test run and its subprocesses are merged
+    # first. The threshold is fail_under in pyproject.toml.
+    python3 -m coverage combine -q || fail "coverage"
+    python3 -m coverage report || fail "coverage"
+else
+    missing_tool coverage coverage
+fi
+
+echo "==> lint"
+if have_module ruff; then
+    python3 -m ruff check . || fail "lint"
+else
+    missing_tool ruff lint
+fi
+
+echo "==> type check"
+if have_module mypy; then
+    python3 -m mypy || fail "type check"
+else
+    missing_tool mypy "type check"
+fi
 
 echo "==> shell syntax"
 sh -n bin/agent-platform || fail "shell syntax"

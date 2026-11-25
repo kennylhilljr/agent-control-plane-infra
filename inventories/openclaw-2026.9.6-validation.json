@@ -48,10 +48,10 @@
     "command_owner_note": "Deferred until the operator chooses a channel identity."
   },
   "backups": {
-    "pre_upgrade_archive": "/Users/bkh223/AgentPlatformBackups/2026-09-24T03-07-48.751-04-00-openclaw-backup.tar.gz",
-    "post_upgrade_archive": "/Users/bkh223/AgentPlatformBackups/2026-09-24T03-10-08.826-04-00-openclaw-backup.tar.gz",
+    "pre_upgrade_archive": "~/AgentPlatformBackups/2026-09-24T03-07-48.751-04-00-openclaw-backup.tar.gz",
+    "post_upgrade_archive": "~/AgentPlatformBackups/2026-09-24T03-10-08.826-04-00-openclaw-backup.tar.gz",
     "post_upgrade_archive_verified": true,
-    "rollback_rehearsal_target": "/Users/bkh223/AgentPlatformBackups/rollback-rehearsal-2026.9.6",
+    "rollback_rehearsal_target": "~/AgentPlatformBackups/rollback-rehearsal-2026.9.6",
     "rollback_rehearsal_entry_count": 353,
     "rollback_rehearsal_verified": true
   },

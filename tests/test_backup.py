@@ -5,9 +5,9 @@ import hashlib
 import inspect
 import json
 import os
+import sys
 import tarfile
 import tempfile
-import sys
 import unittest
 import unittest.mock as mock
 from collections.abc import Callable

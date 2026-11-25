@@ -20,6 +20,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Any, Iterator
+from urllib.parse import unquote
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 _SRC = str(REPO_ROOT / "src")
@@ -36,6 +37,20 @@ REASON_REDACTION_FAILED = "redaction failed"
 REASON_REDACTION_CHANGED = "value changes under redaction"
 REASON_CREDENTIAL = "value looks like a credential"
 REASON_CREDENTIAL_NAME = "member name looks like a credential"
+REASON_HOME_PATH = "value contains an absolute home folder path"
+REASON_HOME_PATH_NAME = "member name contains an absolute home folder path"
+
+# Committed evidence uses home-relative paths ("~/.openclaw"), so an absolute
+# home folder path such as /Users/<name> or /home/<name> leaks a user name.
+# The match starts at the start of the string, a character that is not a
+# letter, digit, "_", "." or "-", or a URL authority ("ssh://host/home/al"),
+# ignores case, and needs a user name component, so a bare "/Users" or "/home"
+# is not flagged. "/srv/home/x" is flagged too: a nested home folder can name
+# a user just as well. Percent-encoded forms are checked after decoding.
+HOME_PATH_PATTERN = re.compile(
+    r"(?:^|[^\w.-]|://[^/\s\"']*)/(?:Users|home)/[^/\s\"'?#&]+",
+    re.IGNORECASE,
+)
 
 # The PEM marker is assembled from pieces so this file does not itself look
 # like a private key block to secret scanners.
@@ -76,6 +91,8 @@ _MASK_PATTERNS: tuple[re.Pattern[str], ...] = (
 def mask_component(component: str) -> str:
     if looks_like_credential(component) or any(pattern.search(component) for pattern in _MASK_PATTERNS):
         return REDACTED
+    if has_home_path(component):
+        return REDACTED
     return component
 
 
@@ -87,11 +104,19 @@ def pointer(components: tuple[str, ...]) -> str:
     return "".join("/" + _escape(mask_component(part)) for part in components)
 
 
+# Path components that name the user when they follow one of these
+# (compared case-insensitively).
+_HOME_PARENTS = frozenset({"users", "home"})
+
+
 def display_path(path: str) -> str:
     parts = Path(path).parts
     if not parts:
         return mask_component(path)
-    masked = [mask_component(part) for part in parts]
+    masked = [
+        REDACTED if index > 0 and parts[index - 1].lower() in _HOME_PARENTS else mask_component(part)
+        for index, part in enumerate(parts)
+    ]
     if Path(path).is_absolute():
         return masked[0] + "/".join(masked[1:])
     return "/".join(masked)
@@ -122,21 +147,37 @@ def redaction_changes(original: Any, redacted: Any, path: tuple[str, ...] = ()) 
         if len(original) != len(redacted):
             yield path
             return
-        for index, (item, other) in enumerate(zip(original, redacted)):
+        for index, (item, other) in enumerate(zip(original, redacted, strict=True)):
             yield from redaction_changes(item, other, (*path, str(index)))
         return
     if not _same_leaf(original, redacted):
         yield path
 
 
+def has_home_path(text: str) -> bool:
+    form = text
+    for _ in range(4):
+        if HOME_PATH_PATTERN.search(form):
+            return True
+        decoded = unquote(form)
+        if decoded == form:
+            return False
+        form = decoded
+    return False
+
+
 def credential_strings(value: Any, path: tuple[str, ...] = ()) -> Iterator[tuple[tuple[str, ...], str]]:
     if isinstance(value, str):
         if looks_like_credential(value):
             yield path, REASON_CREDENTIAL
+        if has_home_path(value):
+            yield path, REASON_HOME_PATH
         return
     for name, item in _children(value):
         if isinstance(value, dict) and looks_like_credential(name):
             yield (*path, name), REASON_CREDENTIAL_NAME
+        if isinstance(value, dict) and has_home_path(name):
+            yield (*path, name), REASON_HOME_PATH_NAME
         yield from credential_strings(item, (*path, name))
 
 

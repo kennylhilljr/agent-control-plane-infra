@@ -12,7 +12,6 @@ from typing import Any, Sequence
 from .backup import BackupManager, SourceChangedDuringBackup
 from .inventory import InventoryCollector
 
-
 DEFAULT_REPOSITORIES = (
     "~/Documents/GitHub/agent-engineers",
     "~/Documents/GitHub/my-research-mcp-server",

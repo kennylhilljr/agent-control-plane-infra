@@ -2,17 +2,17 @@
   "collected_at": "2026-09-24T03:14:20.748922+00:00",
   "ecc": {
     "claude": {
-      "path": "/Users/bkh223/.claude/skills/everything-claude-code",
+      "path": "~/.claude/skills/everything-claude-code",
       "present": true,
       "surface": "skill-directory"
     },
     "codex": {
-      "path": "/Users/bkh223/.codex/skills/everything-claude-code",
+      "path": "~/.codex/skills/everything-claude-code",
       "present": true,
       "surface": "skill-directory"
     },
     "kimi": {
-      "path": "/Users/bkh223/.kimi/skills/everything-claude-code",
+      "path": "~/.kimi/skills/everything-claude-code",
       "present": false,
       "surface": null
     }
@@ -25,19 +25,19 @@
   },
   "installations": {
     "claude_config": {
-      "path": "/Users/bkh223/.claude",
+      "path": "~/.claude",
       "present": true
     },
     "codex_config": {
-      "path": "/Users/bkh223/.codex",
+      "path": "~/.codex",
       "present": true
     },
     "gemini_config": {
-      "path": "/Users/bkh223/.gemini",
+      "path": "~/.gemini",
       "present": true
     },
     "openclaw_state": {
-      "path": "/Users/bkh223/.openclaw",
+      "path": "~/.openclaw",
       "present": true
     }
   },
@@ -286,7 +286,7 @@
       ],
       "dirty": true,
       "head": "84b111e5957711f4988277f435f9f22d7c04b919",
-      "path": "/Users/bkh223/Documents/GitHub/agent-engineers",
+      "path": "~/Documents/GitHub/agent-engineers",
       "status": "ready"
     },
     {
@@ -294,7 +294,7 @@
       "changed_files": [],
       "dirty": false,
       "head": "13b2b98a6f24e1282a387ea9e0017d0fae642fc7",
-      "path": "/Users/bkh223/Documents/GitHub/my-research-mcp-server",
+      "path": "~/Documents/GitHub/my-research-mcp-server",
       "status": "ready"
     },
     {
@@ -313,7 +313,7 @@
       ],
       "dirty": true,
       "head": null,
-      "path": "/Users/bkh223/Documents/GitHub/agent-control-plane-infra",
+      "path": "~/Documents/GitHub/agent-control-plane-infra",
       "status": "ready"
     },
     {
@@ -321,7 +321,7 @@
       "changed_files": [],
       "dirty": false,
       "head": "9943ae39d70883442fe7d441097a7d25882680e3",
-      "path": "/Users/bkh223/Documents/GitHub/openclaw-ecc-orchestrator",
+      "path": "~/Documents/GitHub/openclaw-ecc-orchestrator",
       "status": "ready"
     }
   ],
@@ -333,10 +333,10 @@
       "version": "2.1.39 (Claude Code)"
     },
     "codex": {
-      "executable": "/Users/bkh223/.nvm/versions/node/v22.22.0/bin/codex",
+      "executable": "~/.nvm/versions/node/v22.22.0/bin/codex",
       "exit_code": 1,
       "status": "error",
-      "version": "file:///Users/bkh223/.nvm/versions/node/v22.22.0/lib/node_modules/@openai/codex/bin/codex.js:100"
+      "version": "~/.nvm/versions/node/v22.22.0/lib/node_modules/@openai/codex/bin/codex.js:100"
     },
     "gemini": {
       "executable": "/usr/local/bin/gemini",
@@ -367,7 +367,7 @@
       "version": "v25.2.1"
     },
     "openclaw": {
-      "executable": "/Users/bkh223/.nvm/versions/node/v22.22.0/bin/openclaw",
+      "executable": "~/.nvm/versions/node/v22.22.0/bin/openclaw",
       "exit_code": 0,
       "status": "ready",
       "version": "2026.2.3-1"
