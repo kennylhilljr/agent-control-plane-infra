@@ -54,7 +54,7 @@ The CLI is repository-local. `bin/agent-platform` adds `src/` to `PYTHONPATH` an
 | OpenClaw CLI | No | Adds sanitized OpenClaw metadata when installed. The backup command operates on the state directory and defaults to `~/.openclaw`. |
 | Claude, Codex, Gemini, Kimi, Groq, and Node CLIs | Optional | Their presence and `--version` output are recorded when available. |
 
-There are no third-party Python runtime dependencies. The tests use the standard-library `unittest` runner.
+There are no third-party Python runtime dependencies. The tests use the standard-library `unittest` runner. The optional `dev` extra (`python3 -m pip install -e ".[dev]"`) installs coverage, ruff and mypy for the extra stages of `scripts/check.sh`.
 
 ## Install and run locally
 

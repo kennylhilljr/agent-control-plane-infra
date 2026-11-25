@@ -17,6 +17,22 @@ REDACTED = "<redacted>"
 CHANGED = "value changes under redaction"
 CREDENTIAL = "value looks like a credential"
 CREDENTIAL_NAME = "member name looks like a credential"
+HOME_PATH = "value contains an absolute home folder path"
+HOME_PATH_NAME = "member name contains an absolute home folder path"
+
+
+def shown(path: object) -> str:
+    """The checker's display form of an absolute fixture path.
+
+    The user name after a Users or home directory is masked, so a TMPDIR under
+    the home folder shows as /Users/<redacted>/...
+    """
+    parts = Path(str(path)).parts
+    masked = [
+        REDACTED if index > 0 and parts[index - 1].lower() in ("users", "home") else part
+        for index, part in enumerate(parts)
+    ]
+    return masked[0] + "/".join(masked[1:])
 
 
 def openai_key() -> str:
@@ -97,7 +113,7 @@ class CheckInventoriesTests(unittest.TestCase):
         before = path.read_bytes()
         code, findings, stdout, stderr = self.run_checker(str(path))
         self.assertEqual(code, 1)
-        self.assertEqual(findings, [{"file": str(path), "pointer": "/device/private_key", "reason": CHANGED}])
+        self.assertEqual(findings, [{"file": shown(path), "pointer": "/device/private_key", "reason": CHANGED}])
         self.assertNoLeak(secret, stdout, stderr)
         self.assertEqual(path.read_bytes(), before)
 
@@ -210,9 +226,9 @@ class CheckInventoriesTests(unittest.TestCase):
         self.assertEqual(
             [(item["file"], item["pointer"], item["reason"]) for item in findings],
             [
-                (str(broken), "", "invalid JSON"),
-                (str(bad), "/password", CHANGED),
-                (str(bad), "/list/0", CREDENTIAL),
+                (shown(broken), "", "invalid JSON"),
+                (shown(bad), "/password", CHANGED),
+                (shown(bad), "/list/0", CREDENTIAL),
             ],
         )
 
@@ -221,7 +237,7 @@ class CheckInventoriesTests(unittest.TestCase):
         path = self.dir / "invalid.json"
         path.write_text('{"token": "' + secret + '", broken', encoding="utf-8")
         code, findings, stdout, stderr = self.run_checker(str(path))
-        self.assertEqual((code, findings), (1, [{"file": str(path), "pointer": "", "reason": "invalid JSON"}]))
+        self.assertEqual((code, findings), (1, [{"file": shown(path), "pointer": "", "reason": "invalid JSON"}]))
         self.assertNoLeak(secret, stdout, stderr)
         self.assertNotIn("Traceback", stderr)
 
@@ -238,7 +254,7 @@ class CheckInventoriesTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(
             [(item["file"], item["pointer"], item["reason"]) for item in findings],
-            [(files[0], "", "duplicate object member")] + [(name, "", "invalid JSON") for name in files[1:]],
+            [(shown(files[0]), "", "duplicate object member")] + [(shown(name), "", "invalid JSON") for name in files[1:]],
         )
         self.assertNoLeak(secret.split()[1], stdout, stderr)
 
@@ -255,6 +271,53 @@ class CheckInventoriesTests(unittest.TestCase):
         self.assertNoLeak(secret, stdout, stderr)
         self.assertNoLeak(token, stdout, stderr)
 
+    def test_absolute_home_paths_are_reported_and_names_masked(self) -> None:
+        user = "examplealice"
+        path = self.write(
+            "home.json",
+            {
+                "mac": f"/Users/{user}/.openclaw",
+                "linux": [f"installed at /home/{user}/bin/tool"],
+                "nested": {f"/home/{user}/repo": True},
+                "relative": "~/.openclaw",
+                "bare": "/Users",
+                "other": "/opt/homebrew/bin/node",
+                "inside": "/srv/data/Users/x",
+                "url": f"file://localhost/Users/{user}/x.js",
+                "ssh": f"ssh://host/home/{user}/tool",
+                "upper": f"/USERS/{user}",
+                "encoded": f"https://e.test/?next=%2Fhome%2F{user}",
+                "nested_url": f"https://e.test/?n=file%3A%2F%2Flocalhost%2FUsers%2F{user}%2Fx",
+            },
+        )
+        code, findings, stdout, stderr = self.run_checker(str(path))
+        self.assertEqual(code, 1)
+        self.assertEqual(
+            self.locations(findings),
+            {
+                ("/mac", HOME_PATH),
+                ("/linux/0", HOME_PATH),
+                ("/url", HOME_PATH),
+                ("/ssh", HOME_PATH),
+                ("/upper", HOME_PATH),
+                ("/encoded", HOME_PATH),
+                ("/nested_url", HOME_PATH),
+                (f"/nested/{REDACTED}", HOME_PATH_NAME),
+            },
+        )
+        self.assertNoLeak(user, stdout, stderr)
+
+    def test_home_folder_in_file_argument_is_masked(self) -> None:
+        user = "examplealice"
+        nested = self.dir / "users" / user / "home" / user / "bad.json"
+        nested.parent.mkdir(parents=True)
+        nested.write_text(json.dumps({"key": openai_key()}), encoding="utf-8")
+        code, findings, stdout, stderr = self.run_checker(str(nested))
+        self.assertEqual(code, 1)
+        self.assertEqual(len(findings), 1)
+        self.assertTrue(findings[0]["file"].endswith(f"/users/{REDACTED}/home/{REDACTED}/bad.json"), findings)
+        self.assertNoLeak(user, stdout, stderr)
+
     def test_invalid_utf8_and_missing_file(self) -> None:
         bad_bytes = self.dir / "latin.json"
         bad_bytes.write_bytes(b'{"name": "\xff\xfe"}')
@@ -264,8 +327,8 @@ class CheckInventoriesTests(unittest.TestCase):
         self.assertEqual(
             findings,
             [
-                {"file": str(bad_bytes), "pointer": "", "reason": "invalid UTF-8"},
-                {"file": str(missing), "pointer": "", "reason": "unreadable file"},
+                {"file": shown(bad_bytes), "pointer": "", "reason": "invalid UTF-8"},
+                {"file": shown(missing), "pointer": "", "reason": "unreadable file"},
             ],
         )
         self.assertEqual(stderr, "")
@@ -322,7 +385,7 @@ class CheckInventoriesTests(unittest.TestCase):
         path = self.write(f"{directory}/{name}", {f"id-{secret}": {"password": "v"}, "x": [secret]})
         code, findings, stdout, stderr = self.run_checker(str(path))
         self.assertEqual(code, 1)
-        masked_file = str(self.dir / REDACTED / REDACTED)
+        masked_file = shown(self.dir / REDACTED / REDACTED)
         self.assertEqual({item["file"] for item in findings}, {masked_file})
         self.assertEqual(
             self.locations(findings),
@@ -342,7 +405,7 @@ class CheckInventoriesTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(
             [item["file"] for item in findings],
-            [str(self.dir / REDACTED), str(self.dir / REDACTED), str(self.dir / REDACTED / "x.json")],
+            [shown(self.dir / REDACTED), shown(self.dir / REDACTED), shown(self.dir / REDACTED / "x.json")],
         )
         for value in (secret, token):
             self.assertNoLeak(value, stdout, stderr)

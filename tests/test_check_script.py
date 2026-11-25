@@ -32,6 +32,31 @@ FAILING_TEST = (
 )
 
 INVENTORY_BANNER = "==> inventory"
+DEV_MODULES = ("coverage", "ruff", "mypy")
+
+# A stub package whose import fails, so check.sh sees the module as missing
+# whatever the interpreter running this suite has installed.
+MISSING_MODULE = "raise ImportError('stubbed out by test_check_script')\n"
+
+# A stub "python3 -m <module>" that records its cwd and argv, then exits with
+# the code named in STUB_<MODULE>_EXIT (default 0). The coverage stub's "run"
+# subcommand really runs the module after "-m", so the fixture tests execute,
+# and only its "report" subcommand uses STUB_COVERAGE_EXIT.
+STUB_MAIN = (
+    "import os, runpy, sys\n"
+    "name = __package__\n"
+    "with open(os.environ['SHIM_RECORD'], 'a') as handle:\n"
+    "    handle.write(os.getcwd() + '\\n' + ' '.join([name, *sys.argv[1:]]) + '\\n')\n"
+    "args = sys.argv[1:]\n"
+    "if name == 'coverage' and args[:1] == ['run']:\n"
+    "    target = args[args.index('-m') + 1:]\n"
+    "    sys.argv = target\n"
+    "    runpy.run_module(target[0], run_name='__main__', alter_sys=True)\n"
+    "    raise SystemExit(0)\n"
+    "if name == 'coverage' and args[:1] != ['report']:\n"
+    "    raise SystemExit(0)\n"
+    "raise SystemExit(int(os.environ.get('STUB_' + name.upper() + '_EXIT', '0')))\n"
+)
 INVENTORY_SKIP = "scripts/check_inventories.py not present; skipping"
 
 
@@ -54,12 +79,14 @@ class CheckScriptTests(unittest.TestCase):
         self.home = root / "home"
         self.tmpdir = root / "tmp"
         self.record = root / "record.txt"
+        self.modules = root / "modules"
         for directory in (
             self.fixture / "scripts",
             self.fixture / "bin",
             self.fixture / "src" / "fixmod",
             self.fixture / "tests",
             self.tools,
+            *(self.modules / name for name in DEV_MODULES),
             self.home,
             self.tmpdir,
         ):
@@ -74,6 +101,12 @@ class CheckScriptTests(unittest.TestCase):
         (self.fixture / ".gitignore").write_text("__pycache__/\n*.pyc\n")
 
         os.symlink(sys.executable, self.tools / "python3")
+        for name in DEV_MODULES:
+            (self.modules / name / "__init__.py").write_text(MISSING_MODULE)
+
+    def install_module(self, name: str) -> None:
+        (self.modules / name / "__init__.py").write_text("")
+        (self.modules / name / "__main__.py").write_text(STUB_MAIN)
 
     def add_shim(self, name: str, exit_code: int = 0, record: bool = False) -> None:
         lines = ["#!/bin/sh"]
@@ -93,6 +126,10 @@ class CheckScriptTests(unittest.TestCase):
             "HOME": str(self.home),
             "TMPDIR": str(self.tmpdir),
             "SHIM_RECORD": str(self.record),
+            "PYTHONPATH": str(self.modules),
+            # Most cases exercise other stages; the dev tool cases below
+            # clear this or install stub modules.
+            "ALLOW_NO_DEV_TOOLS": "1",
         }
         if extra_env:
             env.update(extra_env)
@@ -272,10 +309,96 @@ class CheckScriptTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("skipped by ALLOW_NO_GITLEAKS=1", result.stdout)
 
+    def test_dev_tool_opt_in_does_not_suppress_installed_failure(self) -> None:
+        self.add_shim("gitleaks")
+        self.install_module("coverage")
+        self.install_module("ruff")
+        result = self.run_check({"STUB_RUFF_EXIT": "1"})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("lint failed", result.stderr)
+
     def test_opt_in_does_not_suppress_installed_failure(self) -> None:
         self.add_shim("gitleaks", exit_code=1)
         result = self.run_check({"ALLOW_NO_GITLEAKS": "1"})
         self.assertNotEqual(result.returncode, 0)
+
+    def test_missing_dev_tools_are_skipped_with_opt_in(self) -> None:
+        self.add_shim("gitleaks")
+        result = self.run_check()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assert_in_order(
+            result.stdout,
+            [
+                "==> unit tests",
+                "==> coverage",
+                "coverage not installed; skipped by ALLOW_NO_DEV_TOOLS=1",
+                "==> lint",
+                "ruff not installed; skipped by ALLOW_NO_DEV_TOOLS=1",
+                "==> type check",
+                "mypy not installed; skipped by ALLOW_NO_DEV_TOOLS=1",
+                "==> shell syntax",
+            ],
+        )
+
+    def test_missing_dev_tool_fails_without_opt_in(self) -> None:
+        self.add_shim("gitleaks")
+        self.install_module("coverage")
+        self.install_module("mypy")
+        result = self.run_check({"ALLOW_NO_DEV_TOOLS": ""})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("lint failed", result.stderr)
+        self.assertIn("ruff", result.stderr)
+        self.assertIn("ALLOW_NO_DEV_TOOLS=1", result.stderr)
+        self.assertNotIn("==> type check", result.stdout)
+        self.assertNotIn("==> secret scan", result.stdout)
+
+    def test_dev_tools_run_in_order_with_expected_arguments(self) -> None:
+        self.add_shim("gitleaks", record=True)
+        for name in DEV_MODULES:
+            self.install_module(name)
+        result = self.run_check({"ALLOW_NO_DEV_TOOLS": ""})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Ran 1 test", result.stderr)
+        entries = self.record_entries()
+        root = str(self.fixture.resolve())
+        self.assertEqual({cwd for cwd, _ in entries}, {root})
+        self.assertEqual(
+            [argv.rstrip() for _, argv in entries],
+            [
+                "coverage erase",
+                "coverage run --parallel-mode -m unittest discover -s tests",
+                "coverage combine -q",
+                "coverage report",
+                "ruff check .",
+                "mypy",
+                "dir . --no-banner --redact --exit-code 1",
+            ],
+        )
+
+    def test_failing_unit_test_under_coverage_stops(self) -> None:
+        self.add_shim("gitleaks")
+        self.install_module("coverage")
+        (self.fixture / "tests" / "test_fixture.py").write_text(FAILING_TEST)
+        result = self.run_check()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unit tests failed", result.stderr)
+        self.assertNotIn("==> coverage", result.stdout)
+
+    def test_dev_tool_failures_stop_later_stages(self) -> None:
+        cases = (
+            ("coverage", "STUB_COVERAGE_EXIT", "coverage failed", "==> lint"),
+            ("ruff", "STUB_RUFF_EXIT", "lint failed", "==> type check"),
+            ("mypy", "STUB_MYPY_EXIT", "type check failed", "==> shell syntax"),
+        )
+        self.add_shim("gitleaks")
+        for name in DEV_MODULES:
+            self.install_module(name)
+        for name, variable, message, later in cases:
+            with self.subTest(tool=name):
+                result = self.run_check({variable: "1"})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(message, result.stderr)
+                self.assertNotIn(later, result.stdout)
 
     def test_runs_from_non_root_cwd(self) -> None:
         self.add_shim("gitleaks")

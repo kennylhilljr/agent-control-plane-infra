@@ -1,11 +1,62 @@
+[build-system]
+# setuptools 77 is the first release with PEP 639 license and license-files.
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "agent-control-plane-infra"
 version = "0.1.0"
+description = "Sanitized inventory and verified backup tooling for an ECC + OpenClaw agent platform migration."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11.4"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: POSIX",
+]
+
+[project.urls]
+Repository = "https://github.com/kennylhilljr/agent-control-plane-infra"
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
+# Check tooling for scripts/check.sh: lint, type check and coverage.
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "coverage>=7.10"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 130
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agent_platform"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src", "scripts"]
+mypy_path = "src"
+
+[tool.coverage.run]
+source = ["src", "scripts"]
+branch = true
+# Tests run the CLI and scripts/check_inventories.py as subprocesses; measure
+# those too.
+patch = ["subprocess"]
+
+[tool.coverage.report]
+# MIGRATION_SPEC section 12 asks for at least 80 percent coverage.
+fail_under = 80
+show_missing = true
+skip_covered = true

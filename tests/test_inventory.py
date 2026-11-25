@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import json
-import tempfile
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from agent_platform.inventory import AUDIT_STATUS_ALLOWLIST, CommandResult, InventoryCollector, redact
+from agent_platform.inventory import (
+    AUDIT_STATUS_ALLOWLIST,
+    CommandResult,
+    InventoryCollector,
+    home_relative,
+    redact,
+    shorten_file_urls,
+)
 
 REDACTED = "<redacted>"
 
@@ -286,6 +293,92 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(sanitized["label"], "kept")
         self.assertEqual(redact(sanitized), sanitized)
         self.assertEqual(redact({"tokens": REDACTED}), {"tokens": REDACTED})
+
+    def test_paths_under_home_are_written_home_relative(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            (home / ".claude" / "skills" / "everything-claude-code").mkdir(parents=True)
+            repo = home / "code" / "repo"
+            repo.mkdir(parents=True)
+            sibling = Path(directory) / "home-other" / "repo"
+            sibling.mkdir(parents=True)
+            resolved = str(home.resolve())
+
+            def locate(command: str) -> str | None:
+                # One runner reports the unresolved spelling of the home path.
+                return f"{home}/.local/bin/{command}" if command in ("codex", "gemini", "node") else None
+
+            def run(command: tuple[str, ...], timeout: float) -> CommandResult:
+                if command == ("codex", "--version"):
+                    return CommandResult(0, f"codex 1.0 ({resolved}/.nvm/codex)", "", False)
+                if command == ("gemini", "--version"):
+                    return CommandResult(0, f"file://{resolved}/g.js?token=hunter2&next={resolved}/p", "", False)
+                if command == ("node", "--version"):
+                    return CommandResult(0, f"file://localhost{resolved}/n.js", "", False)
+                if command[-2:] == ("rev-parse", "--show-toplevel"):
+                    return CommandResult(0, command[2], "", False)
+                if command[-2:] == ("status", "--porcelain=v1"):
+                    return CommandResult(0, "", "", False)
+                return CommandResult(0, "main", "", False)
+
+            inventory = InventoryCollector(
+                locate=locate,
+                run=run,
+                home=home,
+                repositories=[repo, sibling],
+            ).collect()
+
+        text = json.dumps(inventory)
+        self.assertNotIn(str(home) + "/", text)
+        self.assertNotIn(resolved + "/", text)
+        self.assertEqual(inventory["installations"]["claude_config"]["path"], "~/.claude")
+        self.assertEqual(
+            inventory["ecc"]["claude"]["path"], "~/.claude/skills/everything-claude-code"
+        )
+        self.assertEqual(inventory["runners"]["codex"]["executable"], "~/.local/bin/codex")
+        self.assertEqual(inventory["runners"]["codex"]["version"], "codex 1.0 (~/.nvm/codex)")
+        # A file:// URL under home is still redacted as a URL before it is
+        # shortened to a plain "~" path.
+        gemini_version = inventory["runners"]["gemini"]["version"]
+        self.assertNotIn("hunter2", text)
+        self.assertTrue(gemini_version.startswith("~/g.js?"), gemini_version)
+        self.assertIn("token=%3Credacted%3E", gemini_version)
+        # The non-sensitive query value is rewritten before redaction
+        # percent-encodes it.
+        self.assertIn("next=~%2Fp", gemini_version)
+        self.assertEqual(inventory["runners"]["node"]["version"], "~/n.js")
+        self.assertEqual(inventory["repositories"][0]["path"], "~/code/repo")
+        # A sibling folder whose name only starts with the home folder name
+        # is outside home and keeps its absolute path.
+        self.assertTrue(inventory["repositories"][1]["path"].endswith("/home-other/repo"))
+        self.assertFalse(inventory["repositories"][1]["path"].startswith("~"))
+
+    def test_home_relative_matches_only_at_path_boundaries(self) -> None:
+        homes = ("/Users/al",)
+        self.assertEqual(home_relative("/Users/al", homes), "~")
+        self.assertEqual(home_relative("/Users/al/x", homes), "~/x")
+        self.assertEqual(home_relative("/Users/alice/x", homes), "/Users/alice/x")
+        self.assertEqual(home_relative("/x/Users/al/y", homes), "/x/Users/al/y")
+        self.assertEqual(home_relative("(/Users/al)", homes), "(~)")
+        self.assertEqual(home_relative("/users/AL/x", homes), "~/x")
+        self.assertEqual(home_relative("file:///Users/al/x.js:10", homes), "file:///~/x.js:10")
+        self.assertEqual(home_relative("FILE://localhost/Users/al/x", homes), "FILE://localhost/~/x")
+        self.assertEqual(home_relative("ssh://host/Users/al/t", homes), "ssh://host/~/t")
+        self.assertEqual(home_relative("profile://localhost/Users/al/x", homes), "profile://localhost/~/x")
+        self.assertEqual(home_relative("file://localhost/Users/alice/x", homes), "file://localhost/Users/alice/x")
+        # Encoded paths are left for scripts/check_inventories.py to flag;
+        # nothing is decoded, so "%23" cannot turn into a URL fragment.
+        self.assertEqual(
+            home_relative("https://e.test/?next=%2FUsers%2Fal%23s&token=v", homes),
+            "https://e.test/?next=%2FUsers%2Fal%23s&token=v",
+        )
+        self.assertEqual(home_relative("?next=%2FUsers%2Falice", homes), "?next=%2FUsers%2Falice")
+        self.assertEqual(
+            shorten_file_urls(["file:///~/x?a=1", "FILE://localhost/~", "file:///~x", "profile:///~/x", "ssh://h/~/x"]),
+            ["~/x?a=1", "~", "file:///~x", "profile:///~/x", "ssh://h/~/x"],
+        )
+        self.assertEqual(home_relative("/Users/al.bak", homes), "/Users/al.bak")
+        self.assertEqual(home_relative({"k": ["/Users/al/a", 1]}, homes), {"k": ["~/a", 1]})
 
     def test_committed_inventories_are_stable_under_redaction(self) -> None:
         root = Path(__file__).resolve().parents[1] / "inventories"

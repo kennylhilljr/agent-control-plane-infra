@@ -20,7 +20,6 @@ from agent_platform.backup import AGE_HEADER, BackupManager, looks_synchronized
 from agent_platform.inventory import CommandResult
 
 
-
 def run_cli(argv: list[str]) -> tuple[int, str, str]:
     stdout, stderr = io.StringIO(), io.StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):

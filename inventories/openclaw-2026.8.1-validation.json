@@ -50,10 +50,10 @@
     ]
   },
   "backups": {
-    "pre_upgrade_checkpoint": "/Users/bkh223/AgentPlatformBackups/openclaw-20260924T052012.596577Z",
-    "post_upgrade_archive": "/Users/bkh223/AgentPlatformBackups/2026-09-24T02-59-37.315-04-00-openclaw-backup.tar.gz",
+    "pre_upgrade_checkpoint": "~/AgentPlatformBackups/openclaw-20260924T052012.596577Z",
+    "post_upgrade_archive": "~/AgentPlatformBackups/2026-09-24T02-59-37.315-04-00-openclaw-backup.tar.gz",
     "post_upgrade_archive_verified": true,
-    "rollback_rehearsal_target": "/Users/bkh223/AgentPlatformBackups/rollback-rehearsal-2026.8.1",
+    "rollback_rehearsal_target": "~/AgentPlatformBackups/rollback-rehearsal-2026.8.1",
     "rollback_rehearsal_entry_count": 344,
     "rollback_rehearsal_file_count": 232,
     "rollback_rehearsal_verified": true

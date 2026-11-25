@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 import platform
 import re
-import json
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-
 
 REDACTED = "<redacted>"
 
@@ -151,6 +150,60 @@ def redact(value: Any, key: str = "") -> Any:
     return value
 
 
+def home_relative(value: Any, homes: tuple[str, ...]) -> Any:
+    """Rewrite every occurrence of a home folder path in string values to "~".
+
+    A home path only matches at a path boundary, so "/Users/al" does not
+    rewrite "/Users/alice", and case is ignored. After a URL authority the
+    path keeps its leading slash: "ssh://host/home/al/x" becomes
+    "ssh://host/~/x" and "file:///home/al/x" becomes "file:///~/x", which
+    redact still treats as a URL; run redact next and then shorten_file_urls.
+    Percent-encoded home paths are not rewritten; nothing is decoded, so the
+    rewrite never changes how redact parses a URL, and
+    scripts/check_inventories.py, which decodes when it checks, fails
+    committed evidence that still holds one. Member names are left alone; inventory keys are fixed
+    identifiers, not paths.
+    """
+    patterns: list[tuple[re.Pattern[str], str]] = []
+    for home in homes:
+        home = home.rstrip("/")
+        if not home:
+            continue
+        plain = re.escape(home)
+        patterns.append((re.compile(r"(?<=://)([^/\s?#\"']*)" + plain + _PATH_END, re.IGNORECASE), r"\1/~"))
+        patterns.append((re.compile(r"(?<![\w.-])" + plain + _PATH_END, re.IGNORECASE), "~"))
+    return _map_strings(value, lambda text: _substitute(text, patterns))
+
+
+# A home path ends at "/", the end of the string, or a character that cannot
+# continue a user name.
+_PATH_END = r"(?=/|$|[^\w.-])"
+_FILE_URL_HOME = re.compile(r"(?<![\w+.-])file://[^/\s?#\"']*/~(?=/|\?|#|$)", re.IGNORECASE)
+
+
+def shorten_file_urls(value: Any) -> Any:
+    """Turn the "file:///~/x" URLs left by home_relative into plain "~/x" paths."""
+    return _map_strings(value, lambda text: _FILE_URL_HOME.sub("~", text))
+
+
+def _substitute(text: str, patterns: list[tuple[re.Pattern[str], str]]) -> str:
+    for pattern, replacement in patterns:
+        text = pattern.sub(replacement, text)
+    return text
+
+
+def _map_strings(value: Any, change: Callable[[str], str]) -> Any:
+    if isinstance(value, str):
+        return change(value)
+    if isinstance(value, dict):
+        return {name: _map_strings(item, change) for name, item in value.items()}
+    if isinstance(value, list):
+        return [_map_strings(item, change) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_map_strings(item, change) for item in value)
+    return value
+
+
 def _redact_url(value: str) -> str:
     try:
         parts = urlsplit(value)
@@ -186,7 +239,13 @@ class InventoryCollector:
     ) -> None:
         self.locate = locate
         self.run = run
-        self.home = (home or Path.home()).resolve()
+        given_home = home or Path.home()
+        self.home = given_home.resolve()
+        # Both spellings of the home folder (as given and resolved, e.g.
+        # /var/... and /private/var/... on macOS) are rewritten to "~".
+        self._home_spellings = tuple(
+            sorted({str(given_home), str(self.home)}, key=len, reverse=True)
+        )
         self.repositories = repositories or []
 
     def collect(self) -> dict[str, Any]:
@@ -206,7 +265,11 @@ class InventoryCollector:
             "openclaw": self._openclaw(),
             "repositories": [self._repository(path) for path in self.repositories],
         }
-        return redact(inventory)
+        # Home paths are rewritten before redaction, which percent-encodes
+        # URL query values; file:// URLs are shortened only after redaction,
+        # so their query values are still redacted as URL parameters.
+        sanitized: dict[str, Any] = shorten_file_urls(redact(home_relative(inventory, self._home_spellings)))
+        return sanitized
 
     def _runner(self, name: str) -> dict[str, Any]:
         executable = self.locate(name)

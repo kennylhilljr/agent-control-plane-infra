@@ -15,7 +15,6 @@ from unittest import mock
 from agent_platform import cli
 from agent_platform.backup import BackupManager, BackupResult
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INVENTORIES = REPO_ROOT / "inventories"
 COMMON_KEYS = {
