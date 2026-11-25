@@ -26,6 +26,8 @@ Legend:
   Issue #26: manifest `schema_version` is `1.1`; nothing is written under the system temp directory.
 - [x] **AUTO** Encrypt checkpoints with age on request and refuse unencrypted backups into synchronized folders.
   Issue #39: `--encrypt-to`, `--allow-unencrypted`; manifest `schema_version` is `1.2`.
+- [x] **AUTO** Refuse unencrypted backups to network or unidentified mounts.
+  Issue #44: the destination must match a local mount point by device; `--allow-unencrypted` overrides.
 - [x] **AUTO** Check committed inventory evidence for leaks and over-redaction.
   `python3 scripts/check_inventories.py` (run by `scripts/check.sh`) passes on
   every committed `inventories/**/*.json`; `redact` now covers private keys,

@@ -31,6 +31,13 @@ CONTENT_MARKER = "SYNTHETIC-CONTENT-MARKER-7f3a"
 _INVENTORY_SNAPSHOT: dict[str, bytes] = {}
 
 
+# Unencrypted backups ask `mount` whether the destination is local. These
+# tests are not about that check (tests/test_backup_mounts.py is), so a fake
+# answers "local" instead of running the real tool.
+_LOCAL_MOUNT_PATCH = mock.patch("agent_platform.backup.is_on_local_filesystem",
+                                return_value=True)
+
+
 def _snapshot_inventories() -> dict[str, bytes]:
     return {
         str(path.relative_to(INVENTORIES)): path.read_bytes()
@@ -40,10 +47,12 @@ def _snapshot_inventories() -> dict[str, bytes]:
 
 
 def setUpModule() -> None:
+    _LOCAL_MOUNT_PATCH.start()
     _INVENTORY_SNAPSHOT.update(_snapshot_inventories())
 
 
 def tearDownModule() -> None:
+    _LOCAL_MOUNT_PATCH.stop()
     if _snapshot_inventories() != _INVENTORY_SNAPSHOT:
         raise AssertionError("CLI tests changed files under inventories/")
     status = subprocess.run(

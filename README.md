@@ -146,6 +146,8 @@ The plaintext archive is built in a new `0700` folder under the system temporary
 
 An unencrypted backup into a folder whose path looks synchronized (iCloud Drive's `Mobile Documents`, `Library/CloudStorage`, Dropbox, OneDrive, Google Drive and similar client folders) is refused unless `--allow-unencrypted` is passed. The check matches folder names only, so it does not catch every synchronized folder, such as Desktop and Documents synced by iCloud.
 
+An unencrypted backup is also refused unless `--allow-unencrypted` is passed when the destination is not confirmed to be on a local file system, because a network mount (SMB, NFS, AFP, WebDAV, sshfs) leaves the host. The command runs `mount` (5 second timeout) and accepts the destination, or its nearest existing folder when it does not exist yet, only when its device matches a mount point listed as local: on macOS an entry with the `local` option, on Linux an entry whose type is a known local file system such as `apfs`, `ext4`, `xfs`, `btrfs`, `zfs`, `tmpfs` or `overlay`. Anything else fails closed: another platform, a `mount` that fails or times out, an unlisted file system type, or a destination that matches no local entry. `--dry-run` runs the same check. The check is skipped with `--encrypt-to` or `--allow-unencrypted`.
+
 ## Configure provider detection
 
 The inventory command checks whether provider environment variables are set. It records only a boolean named `credential_configured`; it never copies the value into the report.
@@ -189,7 +191,7 @@ Without `--repository`, the command checks the default paths declared in `src/ag
 | `--backup-dir PATH` | Required destination for timestamped checkpoints. |
 | `--source PATH` | OpenClaw state to back up; defaults to `~/.openclaw`. |
 | `--encrypt-to RECIPIENT` | Encrypts the archive with age to this public recipient. Repeat for more recipients. See [Encrypt the checkpoint](#encrypt-the-checkpoint). |
-| `--allow-unencrypted` | Allows an unencrypted archive in a folder whose path looks synchronized. |
+| `--allow-unencrypted` | Allows an unencrypted archive in a folder whose path looks synchronized or that is not confirmed to be on a local file system. |
 | `--dry-run` | Enumerates eligible files and reports planned paths without creating the destination. Encryption options are checked too. |
 | `--json` | Requests the JSON result envelope. The current implementation emits the envelope for backup operations in both modes. |
 
